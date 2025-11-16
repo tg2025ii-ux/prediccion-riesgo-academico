@@ -257,7 +257,7 @@ elif menu == "📤 Cargar Datos":
         st.markdown("### 📥 Paso 1: Descarga la Plantilla")
         
         # Ruta de la plantilla
-        plantilla_path = os.path.join(os.path.dirname(__file__), "data", "Plantilla.xlsm")
+        plantilla_path = os.path.join(os.path.dirname(__file__), "Plantilla.xlsm")
         try:
             with open(plantilla_path, "rb") as file:
                 st.download_button(
