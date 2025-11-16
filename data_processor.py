@@ -138,7 +138,6 @@ class DataProcessor:
     def _get_mean_dict(self):
         """Retorna el diccionario de medias para estandarización"""
         return {
-           mean_dict = {
     "Ciclo": 1924.127617,
     "Ciclo Admisión": 1790.081606,
     "Mult Programa": 1.09136007,
@@ -295,13 +294,11 @@ class DataProcessor:
     "Cred_Min_Calif_Ciclo": 3.212715526,
     "Créditos Inscritos y Aprobados Ciclo": 14.61555565,
     "Rango_Ponderado_Ciclo": 8.859326887
-}
         }
     
     def _get_scale_dict(self):
         """Retorna el diccionario de desviaciones estándar para estandarización"""
         return {
-           scale_dict = {
     "Ciclo": 150.3089918,
     "Ciclo Admisión": 155.2047776,
     "Mult Programa": 0.355747881,
@@ -458,7 +455,6 @@ class DataProcessor:
     "Cred_Min_Calif_Ciclo": 1.928524097,
     "Créditos Inscritos y Aprobados Ciclo": 4.155359775,
     "Rango_Ponderado_Ciclo": 7.419506355
-}
         }
     
     def _get_coefficients(self):
