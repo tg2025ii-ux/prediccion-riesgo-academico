@@ -111,7 +111,7 @@ processor = get_processor()
 
 # Sidebar
 with st.sidebar:
-    st.image("Pontificia-Universidad-Javeriana-Bogota-Cali-Escudo-Logo-Oficial.PNG", use_container_width=True)
+    st.image("Javeriana.jpg", use_container_width=True)
     st.markdown("---")
     
     st.markdown(f"""
