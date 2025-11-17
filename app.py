@@ -175,12 +175,12 @@ with st.sidebar:
 
 # Página principal
 if menu == "🏠 Inicio":
-    st.title("🎓 Sistema de alerta de deserción temprana")
+    st.title("🎓 Sistema de alerta de deserción universitaria")
     
     st.markdown(f"""
     <div class='success-message'>
-        <h3>👋 ¡Bienvenido!</h3>
-        <p>Esta herramienta utiliza <b>Machine Learning</b> para predecir el riesgo académico de estudiantes 
+        <h3>👋 ¡Bienvenid@!</h3>
+        <p>Esta herramienta utiliza <b>Machine Learning</b> para predecir el riesgo de deserción de estudiantes
         basándose en múltiples factores como:</p>
     </div>
     """, unsafe_allow_html=True)
@@ -192,10 +192,10 @@ if menu == "🏠 Inicio":
         <div class='metric-card'>
             <h4>📚 Académico</h4>
             <ul>
-                <li>Promedio acumulado</li>
-                <li>Créditos aprobados</li>
-                <li>Materias perdidas</li>
-                <li>Situación académica</li>
+                <li>Promedio Académico</li>
+                <li>Situación Académica</li>
+                <li>Categorías de Clases</li>
+                <li>Ciclo de Admisión</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -205,10 +205,10 @@ if menu == "🏠 Inicio":
         <div class='metric-card'>
             <h4>👤 Personal</h4>
             <ul>
-                <li>Programa académico</li>
-                <li>Edad y sexo</li>
-                <li>Origen geográfico</li>
-                <li>Tipo de admisión</li>
+                <li>Edad</li>
+                <li>Sexo</li>
+                <li>Origen geográfic</li>
+                <li>Ciudad de residencia</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -218,17 +218,17 @@ if menu == "🏠 Inicio":
         <div class='metric-card'>
             <h4>📈 Rendimiento</h4>
             <ul>
-                <li>Ciclo actual</li>
                 <li>Calificaciones del ciclo</li>
-                <li>Créditos inscritos</li>
-                <li>Categorías de clases</li>
+                <li>Materias perdidas</li>
+                <li>Promedio Acumulado</li>
+                <li>Créditos Aprobados</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
-    st.markdown("### 🚀 Cómo usar esta herramienta")
+    st.markdown("### ⚙️ Cómo usar esta herramienta")
     
     steps = """
     1. **📥 Descarga la plantilla** de Excel desde la sección "Cargar Datos"
@@ -286,35 +286,51 @@ elif menu == "📤 Cargar Datos":
     # Botón de descarga de plantilla
     col1, col2 = st.columns([1, 2])
     
-    with col1:
-        st.markdown("### 📥 Paso 1: Descarga la Plantilla")
-        
-        # Ruta de la plantilla
-        plantilla_path = os.path.join(os.path.dirname(__file__), "Plantilla.xlsm")
-        try:
-            with open(plantilla_path, "rb") as file:
-                st.download_button(
-                    label="⬇️ Descargar Plantilla",
-                    data=file,
-                    file_name="Plantilla_Estudiantes.xlsm",
-                    mime="application/vnd.ms-excel.sheet.macroEnabled.12",
-                    use_container_width=True
-                )
-        except Exception as e:
-            st.warning(f"La plantilla no está disponible en este momento. Error: {str(e)}")
+with col1:
+    st.markdown("### 📥 Paso 1: Descarga la Plantilla")
+
+    # Ruta del instructivo PDF
+    instructivo_path = os.path.join(os.path.dirname(__file__), "Instructivo.pdf")
+    try:
+        with open(instructivo_path, "rb") as file:
+            st.download_button(
+                label="⬇️ Descargar Instructivo Plantilla",
+                data=file,
+                file_name="Instructivo.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+    except Exception as e:
+        st.warning(f"El instructivo no está disponible en este momento. Error: {str(e)}")
+
+    # Ruta de la plantilla Excel
+    plantilla_path = os.path.join(os.path.dirname(__file__), "Plantilla.xlsm")
+    try:
+        with open(plantilla_path, "rb") as file:
+            st.download_button(
+                label="⬇️ Descargar Plantilla",
+                data=file,
+                file_name="Plantilla.xlsm",
+                mime="application/vnd.ms-excel.sheet.macroEnabled.12",
+                use_container_width=True
+            )
+    except Exception as e:
+        st.warning(f"La plantilla no está disponible en este momento. Error: {str(e)}")
     
     with col2:
         st.markdown("""
         **Instrucciones:**
         1. Descarga la plantilla Excel
         2. Completa la información de cada estudiante
-        3. Guarda el archivo y sube el resultado aquí
+        3. Guarda el archivo
         
-        **Nota:** La plantilla incluye una macro que genera el archivo `Estudiantes_Limpio.xlsx`
+        **Nota 1:** La plantilla incluye una macro que genera el archivo `Estudiantes_Limpio.xlsx`. Debes activar los permisos para el uso de macros 
+        **Nota 2:** Si ya se decargó la plantilla no es necesario volver a descargarla
         """)
     
     st.markdown("---")
-    
+
+    with col1:
     st.markdown("### 📤 Paso 2: Carga tu Archivo")
     
     uploaded_file = st.file_uploader(
@@ -322,7 +338,16 @@ elif menu == "📤 Cargar Datos":
         type=['xlsx', 'xls'],
         help="Archivo generado por la plantilla con datos de estudiantes"
     )
-    
+
+    with col2:
+        st.markdown("""
+        **Instrucciones:**
+        1. Sube el archivo `Estudiantes_Limpio.xlsx`
+        2. Sí el archivio es válido puedes continuar. En caso contario, verifica el cargado
+        3. Da clic en "Procesar Datos"
+        4. Sí desea puede previsualizar los datos ingresados
+        5. Sí el proceso se ejecuto correctamente aparecerá un mensaje de confirmación
+            
     if uploaded_file is not None:
         with st.spinner("🔄 Procesando archivo..."):
             try:
@@ -336,7 +361,7 @@ elif menu == "📤 Cargar Datos":
                     st.markdown(f"""
                     <div class='success-message'>
                         <h4>✅ Archivo válido</h4>
-                        <p>Se encontraron <b>{len(df)}</b> estudiantes para analizar.</p>
+                        <p>Se encontraron <b>{len(df)}</b> estudiantes para analizar. Sí quiere conocer el significado de las variable consulte el instructivo del paso 1.</p>
                     </div>
                     """, unsafe_allow_html=True)
                     
