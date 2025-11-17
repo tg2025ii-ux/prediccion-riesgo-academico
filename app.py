@@ -22,6 +22,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Forzar consistencia visual
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif !important;
+        font-size: 16px !important;
+    }
+    
+    .main .block-container {
+        max-width: 1200px;
+        padding: 2rem 3rem;
+    }
+    
+    /* Prevenir ajustes automáticos de texto */
+    * {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Colores institucionales
 COLORS = {
     "primary": "#003D3D",      # Verde oscuro (Cajicá)
