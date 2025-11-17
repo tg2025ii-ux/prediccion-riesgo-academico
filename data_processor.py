@@ -817,6 +817,15 @@ class DataProcessor:
         """
         data = df.copy()
         
+        # Guardar ID si existe
+        id_column = None
+        if 'ID' in data.columns:
+            id_column = data['ID'].copy()
+            data = data.drop(columns=['ID'])
+        
+        # Guardar datos originales para el reporte final
+        datos_originales = data.copy()
+        
         # 1. Tipo Admisión
         data["TRL"] = 0
         data["IPS"] = 0
@@ -1016,7 +1025,19 @@ class DataProcessor:
             labels=["Bajo", "Medio", "Alto"]
         )
         
-        return data
+        # 16. Crear DataFrame final con datos originales + resultados
+        resultado_final = datos_originales.copy()
+        resultado_final["probabilidad"] = data["probabilidad"].values
+        resultado_final["nivel_riesgo"] = data["nivel_riesgo"].values
+        
+        # Agregar ID al inicio si existe
+        if id_column is not None:
+            resultado_final.insert(0, 'ID', id_column)
+        else:
+            # Si no hay ID, crear columna vacía
+            resultado_final.insert(0, 'ID', '')
+        
+        return resultado_final
     
     def get_summary_stats(self, df):
         """
