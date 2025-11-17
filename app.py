@@ -141,7 +141,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # Página principal
-if menu == "🏠 Inicio":
+if menu == "Inicio":
     st.title("🎓 Sistema de Predicción de Riesgo Académico")
     
     st.markdown(f"""
@@ -586,10 +586,10 @@ else:  # Ayuda
     st.markdown("### 📧 Contacto y Soporte")
     
     st.info("""
-    **Desarrollado por:** [Tu Nombre]  
+    **Desarrollado por:** [Luis Atencio, Natalia Delgado y Alejandra Mesa]  
     **Universidad:** Pontificia Universidad Javeriana  
     **Proyecto:** Trabajo de Grado  
-    **Email:** correo@universidad.edu
+    **Email:** [latencio@javeriana.edu.co,ndelgadog@javeriana.edu.co,malejandramesa@javeriana.edu.co]
     """)
 
 # Footer
