@@ -24,14 +24,14 @@ st.set_page_config(
 
 # Colores institucionales
 COLORS = {
-    "primary": "#003D3D",      # Verde oscuro (Cajicá)
-    "secondary": "#5B9FA0",    # Azul turquesa (Chía)
-    "accent": "#F4E85A",       # Amarillo
-    "background": "#FAFAFA",   # Fondo
-    "text": "#333333",
-    "success": "#5B9FA0",
-    "warning": "#F4E85A",
-    "danger": "#D32F2F"
+    "primary": "#3A4A3D",      # Verde oscuro (SÓLIDO)
+    "secondary": "#8B9D83",    # Verde claro (ARENA)
+    "accent": "#5C6B5E",       # Verde medio (SERENO)
+    "background": "#FAFAFA",   # Fondo (mantener claro)
+    "text": "#2A3A2D",         # Texto oscuro
+    "success": "#8B9D83",      # Verde claro para éxitos
+    "warning": "#5C6B5E",      # Verde medio para advertencias
+    "danger": "#3A4A3D"        # Verde oscuro para peligros/errores
 }
 
 # CSS personalizado
