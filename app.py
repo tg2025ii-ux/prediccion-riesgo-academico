@@ -360,7 +360,7 @@ with col1:
                 if is_valid:
                     st.markdown(f"""
                     <div class='success-message'>
-                        <h4>✅ Archivo válido</h4>
+                        <h4>✔️ Archivo válido</h4>
                         <p>Se encontraron <b>{len(df)}</b> estudiantes para analizar.</p>
                     </div>
                     """, unsafe_allow_html=True)
