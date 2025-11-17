@@ -28,7 +28,7 @@ COLORS = {
     "secondary": "#5B9FA0",    # Azul turquesa (Chía)
     "accent": "#F4E85A",       # Amarillo
     "background": "#FAFAFA",   # Fondo
-    "text": "#333333",
+    "text": "#FFFFFF",
     "success": "#5B9FA0",
     "warning": "#F4E85A",
     "danger": "#D32F2F"
