@@ -832,14 +832,18 @@ class DataProcessor:
             data[col] = (data["Programa"] == prog).astype(int)
         data.drop(columns=["Programa"], inplace=True)
         
-        # 3. Situación Académica
+        # 3. Eliminar Benef. Beca (no se usa en el modelo)
+        if "Benef. Beca" in data.columns:
+            data.drop(columns=["Benef. Beca"], inplace=True)
+        
+        # 4. Situación Académica
         map_situacion = {"Normal": 0, "Primera Prueba": 1, "Segunda Prueba": 2}
         data["Situacion Acad"] = data["Situacion Acad"].map(map_situacion)
         
-        # 4. Sexo
+        # 5. Sexo
         data["Sexo"] = data["Sexo"].replace({"Masculino": 1, "Femenino": 0})
         
-        # 5. Edad
+        # 6. Edad
         def map_age_groups(age):
             if age <= 19:
                 return 0
@@ -853,11 +857,11 @@ class DataProcessor:
         data["Edad"] = data["Edad"].apply(map_age_groups)
         data.rename(columns={"Edad": "Rango edad"}, inplace=True)
         
-        # 6. Internacional
+        # 7. Internacional
         data["Nacio en Colombia"] = data["Nacio en Colombia"].replace({"Si": 0, "No": 1})
         data = data.rename(columns={"Nacio en Colombia": "Internacional"})
         
-        # 7. Departamento Nacimiento
+        # 8. Departamento Nacimiento
         data["Dpto.Nacimiento"] = data["Dpto.Nacimiento"].astype(str).str.strip()
         for dep in self.departamentos:
             col_name = f"dn_{dep.replace(' ', '_')}"
@@ -867,11 +871,11 @@ class DataProcessor:
             data.loc[data["Dpto.Nacimiento"] == dep, col_name] = 1
         data.drop(columns=["Dpto.Nacimiento"], inplace=True)
         
-        # 8. Vive en Bogotá
+        # 9. Vive en Bogotá
         data["Vive en Bogotá"] = data["Vive en Bogotá"].replace({"Si": 1, "No": 0})
         data = data.rename(columns={"Vive en Bogotá": "cd_Bogotá D.C."})
         
-        # 9. Categoría MaxClase
+        # 10. Categoría MaxClase
         data["Categoría MaxClase"] = data["Categoría MaxClase"].astype(str).str.strip()
         for cat in self.categorias_max:
             data[f"ccmax_{cat}"] = 0
@@ -881,7 +885,7 @@ class DataProcessor:
             data[f"ccmax_{cat}"] = dummies[cat]
         data.drop(columns=["Categoría MaxClase"], inplace=True)
         
-        # 10. Categoría MinClase
+        # 11. Categoría MinClase
         data["Categoría MinClase"] = data["Categoría MinClase"].astype(str).str.strip()
         for cat in self.categorias_min:
             data[f"ccmin_{cat}"] = 0
@@ -891,7 +895,7 @@ class DataProcessor:
             data[f"ccmin_{cat}"] = dummies[cat]
         data.drop(columns=["Categoría MinClase"], inplace=True)
         
-        # 11. Procesamiento de Siglas
+        # 12. Procesamiento de Siglas
         siglas = [
             "LTEOL", "TEOLO", "DRCH2", "INFBN", "BACTE", "ARTV2", "FINA2", "ARQUI",
             "FILOS", "ANTR2", "RLINT", "PSIC2", "ECONM", "LLMOD", "MAGRV", "IMECA",
@@ -920,7 +924,7 @@ class DataProcessor:
         
         data.drop(columns=["Siglas"], inplace=True)
         
-        # 12. Análisis de Notas
+        # 13. Análisis de Notas
         import re
         
         # Identificar columnas de notas y créditos
@@ -986,7 +990,7 @@ class DataProcessor:
         cols_a_eliminar = [c for c in data.columns if re.match(r"(Nota clase \d+|Créditos clase \d+)$", c)]
         data = data.drop(columns=cols_a_eliminar)
         
-        # 13. Estandarización
+        # 14. Estandarización
         variables_escalables = [
             col for col in data.columns
             if col in self.mean_dict and col in self.scale_dict
@@ -997,7 +1001,7 @@ class DataProcessor:
             data[variables_escalables] - mean_series[variables_escalables]
         ) / scale_series[variables_escalables]
         
-        # 12. Calcular probabilidad
+        # 15. Calcular probabilidad
         variables_comunes = [col for col in self.coef_dict.keys() if col in data.columns]
         coef_series = pd.Series(self.coef_dict)
         data["log_odds"] = (
