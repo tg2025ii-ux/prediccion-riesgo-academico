@@ -47,14 +47,14 @@ st.markdown("""
 
 # Colores institucionales
 COLORS = {
-    "primary": "#003D3D",      # Verde oscuro (Cajicá)
-    "secondary": "#5B9FA0",    # Azul turquesa (Chía)
-    "accent": "#F4E85A",       # Amarillo
-    "background": "#262730",   # Fondo
-    "text": "#FFFFFF",
-    "success": "#5B9FA0",
-    "warning": "#F4E85A",
-    "danger": "#D32F2F"
+    "primary": "#3A4A3D",      # Verde oscuro (SÓLIDO)
+    "secondary": "#8B9D83",    # Verde claro (ARENA)
+    "accent": "#5C6B5E",       # Verde medio (SERENO)
+    "background": "#FAFAFA",   # Fondo
+    "text": "#2A3A2D",         # Texto oscuro
+    "success": "#8B9D83",      # Verde claro para éxitos
+    "warning": "#5C6B5E",      # Verde medio para advertencias
+    "danger": "#3A4A3D"        # Verde oscuro para peligros/errores
 }
 
 # CSS personalizado
@@ -82,25 +82,25 @@ st.markdown(f"""
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         border-left: 4px solid {COLORS['primary']};
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     .metric-card h1, .metric-card h2, .metric-card h3, .metric-card h4, .metric-card p {{
-        color: #000000 !important;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000 !important;
     }}
     .risk-high {{
         background-color: #FFEBEE;
         border-left: 4px solid {COLORS['danger']};
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     .risk-medium {{
         background-color: #FFF9C4;
         border-left: 4px solid {COLORS['warning']};
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     .risk-low {{
         background-color: #E8F5E9;
         border-left: 4px solid {COLORS['success']};
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     h1 {{
         color: {COLORS['primary']};
@@ -114,7 +114,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['success']};
         border-radius: 5px;
         margin: 1rem 0;
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     .warning-message {{
         padding: 1rem;
@@ -122,7 +122,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['warning']};
         border-radius: 5px;
         margin: 1rem 0;
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     .error-message {{
         padding: 1rem;
@@ -130,7 +130,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['danger']};
         border-radius: 5px;
         margin: 1rem 0;
-        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+        color: #000000;
     }}
     </style>
 """, unsafe_allow_html=True)
@@ -148,7 +148,7 @@ with st.sidebar:
     st.markdown("---")
     
     st.markdown(f"""
-    <div style='padding: 1rem; background-color: #262730; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
+    <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
         <h3 style='color: {COLORS['text']}; margin-top: 0;'>📊 Sistema de Predicción</h3>
         <p style='color: {COLORS['text']}; margin-bottom: 0;'>
         Herramienta de análisis predictivo para identificar estudiantes en riesgo académico.
@@ -207,7 +207,7 @@ if menu == "🏠 Inicio":
             <ul>
                 <li>Edad</li>
                 <li>Sexo</li>
-                <li>Origen geográfic</li>
+                <li>Origen geográfico</li>
                 <li>Ciudad de residencia</li>
             </ul>
         </div>
@@ -286,36 +286,36 @@ elif menu == "📤 Cargar Datos":
     # Botón de descarga de plantilla
     col1, col2 = st.columns([1, 2])
     
-with col1:
-    st.markdown("### 📥 Paso 1: Descarga la Plantilla")
+    with col1:
+        st.markdown("### 📥 Paso 1: Descarga la Plantilla")
 
-    # Ruta del instructivo PDF
-    instructivo_path = os.path.join(os.path.dirname(__file__), "Instructivo.pdf")
-    try:
-        with open(instructivo_path, "rb") as file:
-            st.download_button(
-                label="⬇️ Descargar Instructivo Plantilla",
-                data=file,
-                file_name="Instructivo.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
-    except Exception as e:
-        st.warning(f"El instructivo no está disponible en este momento. Error: {str(e)}")
+        # Ruta del instructivo PDF
+        instructivo_path = os.path.join(os.path.dirname(__file__), "Instructivo.pdf")
+        try:
+            with open(instructivo_path, "rb") as file:
+                st.download_button(
+                    label="⬇️ Descargar Instructivo Plantilla",
+                    data=file,
+                    file_name="Instructivo.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.warning(f"El instructivo no está disponible en este momento. Error: {str(e)}")
 
-    # Ruta de la plantilla Excel
-    plantilla_path = os.path.join(os.path.dirname(__file__), "Plantilla.xlsm")
-    try:
-        with open(plantilla_path, "rb") as file:
-            st.download_button(
-                label="⬇️ Descargar Plantilla",
-                data=file,
-                file_name="Plantilla.xlsm",
-                mime="application/vnd.ms-excel.sheet.macroEnabled.12",
-                use_container_width=True
-            )
-    except Exception as e:
-        st.warning(f"La plantilla no está disponible en este momento. Error: {str(e)}")
+        # Ruta de la plantilla Excel
+        plantilla_path = os.path.join(os.path.dirname(__file__), "Plantilla.xlsm")
+        try:
+            with open(plantilla_path, "rb") as file:
+                st.download_button(
+                    label="⬇️ Descargar Plantilla",
+                    data=file,
+                    file_name="Plantilla.xlsm",
+                    mime="application/vnd.ms-excel.sheet.macroEnabled.12",
+                    use_container_width=True
+                )
+        except Exception as e:
+            st.warning(f"La plantilla no está disponible en este momento. Error: {str(e)}")
     
     with col2:
         st.markdown("""
@@ -325,28 +325,33 @@ with col1:
         3. Guarda el archivo
         
         **Nota 1:** La plantilla incluye una macro que genera el archivo `Estudiantes_Limpio.xlsx`. Debes activar los permisos para el uso de macros 
-        **Nota 2:** Si ya se decargó la plantilla no es necesario volver a descargarla
+        
+        **Nota 2:** Si ya se descargó la plantilla no es necesario volver a descargarla
         """)
     
     st.markdown("---")
-
-    with col1:
-    st.markdown("### 📤 Paso 2: Carga tu Archivo")
     
-    uploaded_file = st.file_uploader(
-        "Sube el archivo Estudiantes_Limpio.xlsx",
-        type=['xlsx', 'xls'],
-        help="Archivo generado por la plantilla con datos de estudiantes"
-    )
+    # Segunda sección - Cargar archivo
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.markdown("### 📤 Paso 2: Carga tu Archivo")
+        
+        uploaded_file = st.file_uploader(
+            "Sube el archivo Estudiantes_Limpio.xlsx",
+            type=['xlsx', 'xls'],
+            help="Archivo generado por la plantilla con datos de estudiantes"
+        )
 
     with col2:
         st.markdown("""
         **Instrucciones:**
         1. Sube el archivo `Estudiantes_Limpio.xlsx`
-        2. Sí el archivio es válido puedes continuar. En caso contario, verifica el cargado
+        2. Si el archivo es válido puedes continuar. En caso contrario, verifica el cargado
         3. Da clic en "Procesar Datos"
-        4. Sí desea puede previsualizar los datos ingresados
-        5. Sí el proceso se ejecuto correctamente aparecerá un mensaje de confirmación
+        4. Si desea puede previsualizar los datos ingresados
+        5. Si el proceso se ejecutó correctamente aparecerá un mensaje de confirmación
+        """)
             
     if uploaded_file is not None:
         with st.spinner("🔄 Procesando archivo..."):
@@ -360,7 +365,7 @@ with col1:
                 if is_valid:
                     st.markdown(f"""
                     <div class='success-message'>
-                        <h4> Archivo válido</h4>
+                        <h4>✅ Archivo válido</h4>
                         <p>Se encontraron <b>{len(df)}</b> estudiantes para analizar.</p>
                     </div>
                     """, unsafe_allow_html=True)
