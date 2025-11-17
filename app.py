@@ -589,7 +589,6 @@ else:  # Ayuda
     **Desarrollado por:** Luis Atencio, Natalia Delgado y Alejandra Mesa  
     **Universidad:** Pontificia Universidad Javeriana  
     **Proyecto:** Trabajo de Grado 253028 
-    
     **Email:** latencio@javeriana.edu.co, ndelgadog@javeriana.edu.co, malejandramesa@javeriana.edu.co
     """)
 
