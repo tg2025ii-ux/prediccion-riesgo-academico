@@ -27,7 +27,7 @@ COLORS = {
     "primary": "#003D3D",      # Verde oscuro (Cajicá)
     "secondary": "#5B9FA0",    # Azul turquesa (Chía)
     "accent": "#F4E85A",       # Amarillo
-    "background": "#FAFAFA",   # Fondo
+    "background": "#262730",   # Fondo
     "text": "#FFFFFF",
     "success": "#5B9FA0",
     "warning": "#F4E85A",
