@@ -142,7 +142,7 @@ with st.sidebar:
 
 # Página principal
 if menu == "🏠 Inicio":
-    st.title("🎓 Sistema de Predicción de Riesgo Académico")
+    st.title("🎓 Sistema de alerta de deserción temprana")
     
     st.markdown(f"""
     <div class='success-message'>
@@ -596,7 +596,7 @@ else:  # Ayuda
 st.markdown("---")
 st.markdown(f"""
 <div style='text-align: center; color: {COLORS['text']}; padding: 2rem;'>
-    <p>Sistema de Predicción de Riesgo Académico | Universidad Javeriana | {datetime.now().year}</p>
+    <p>Sistema de alerta de deserción temprana | Universidad Javeriana | {datetime.now().year}</p>
     <p style='font-size: 0.8rem;'>Desarrollado con ❤️ usando Streamlit y Machine Learning</p>
 </div>
 """, unsafe_allow_html=True)
