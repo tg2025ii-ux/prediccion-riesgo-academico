@@ -28,7 +28,7 @@ COLORS = {
     "secondary": "#5B9FA0",    # Azul turquesa (Chía)
     "accent": "#F4E85A",       # Amarillo
     "background": "#FAFAFA",   # Fondo
-    "text": "#000000",
+    "text": "#333333",
     "success": "#5B9FA0",
     "warning": "#F4E85A",
     "danger": "#D32F2F"
@@ -59,18 +59,25 @@ st.markdown(f"""
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         border-left: 4px solid {COLORS['primary']};
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
+    }}
+    .metric-card h1, .metric-card h2, .metric-card h3, .metric-card h4, .metric-card p {{
+        color: #000000 !important;  /* ← AGREGA ESTA LÍNEA */
     }}
     .risk-high {{
         background-color: #FFEBEE;
         border-left: 4px solid {COLORS['danger']};
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     .risk-medium {{
         background-color: #FFF9C4;
         border-left: 4px solid {COLORS['warning']};
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     .risk-low {{
         background-color: #E8F5E9;
         border-left: 4px solid {COLORS['success']};
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     h1 {{
         color: {COLORS['primary']};
@@ -84,6 +91,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['success']};
         border-radius: 5px;
         margin: 1rem 0;
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     .warning-message {{
         padding: 1rem;
@@ -91,6 +99,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['warning']};
         border-radius: 5px;
         margin: 1rem 0;
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     .error-message {{
         padding: 1rem;
@@ -98,6 +107,7 @@ st.markdown(f"""
         border-left: 4px solid {COLORS['danger']};
         border-radius: 5px;
         margin: 1rem 0;
+        color: #000000;  /* ← AGREGA ESTA LÍNEA */
     }}
     </style>
 """, unsafe_allow_html=True)
