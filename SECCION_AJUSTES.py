@@ -233,6 +233,15 @@ def seccion_ajustes():
         
         data_final = st.session_state['data_final']
         
+        # ⚠️ VERIFICAR Y ELIMINAR DUPLICADOS
+        if data_final.columns.duplicated().any():
+            st.warning("⚠️ Detectadas columnas duplicadas. Eliminando automáticamente...")
+            duplicados = data_final.columns[data_final.columns.duplicated()].tolist()
+            st.write(f"Duplicados encontrados: {duplicados[:10]}")
+            data_final = data_final.loc[:, ~data_final.columns.duplicated()]
+            st.session_state['data_final'] = data_final  # Actualizar
+            st.success(f"✅ Duplicados eliminados. Columnas actuales: {len(data_final.columns)}")
+        
         # Métricas principales
         col1, col2, col3, col4 = st.columns(4)
         
