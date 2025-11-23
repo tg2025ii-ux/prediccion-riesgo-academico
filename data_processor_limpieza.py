@@ -137,7 +137,7 @@ class DataProcessorLimpieza:
         # PASO 4: NOTAS
         notas = notas.rename(columns={
             'Grado_Academico': 'Mult Programa',
-            'Programa_Academico_Base': 'Programa'
+            'Programa Académico Base': 'Programa'
         })
         
         print("   ✓ Renombres completados")
