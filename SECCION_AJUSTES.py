@@ -257,7 +257,72 @@ def seccion_ajustes():
         
         # Tabs para explorar
         tab1, tab2, tab3, tab4 = st.tabs(["👁️ Vista Previa", "📋 Columnas", "📊 Estadísticas", "⚠️ Verificaciones"])
-
+        
+        with tab1:
+            st.write("**Primeras 100 filas:**")
+            st.dataframe(
+                data_final.head(100),
+                use_container_width=True,
+                height=400
+            )
+        
+        with tab2:
+            st.write("### Lista de Columnas")
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                # Mostrar todas las columnas
+                columnas_df = pd.DataFrame({
+                    'Columna': data_final.columns,
+                    'Tipo': data_final.dtypes.astype(str),
+                    'No Nulos': data_final.count().values,
+                    'Nulos': data_final.isnull().sum().values
+                })
+                st.dataframe(columnas_df, use_container_width=True, height=600)
+            
+            with col2:
+                # Resumen por tipo
+                st.write("**Tipos de datos:**")
+                tipos = data_final.dtypes.value_counts()
+                for tipo, count in tipos.items():
+                    st.write(f"• `{tipo}`: {count} columnas")
+                
+                # Prefijos
+                st.write("\n**Prefijos:**")
+                prefijos = {}
+                for col in data_final.columns:
+                    if '_' in col:
+                        prefijo = col.split('_')[0]
+                        prefijos[prefijo] = prefijos.get(prefijo, 0) + 1
+                
+                for prefijo, count in sorted(prefijos.items()):
+                    st.write(f"• `{prefijo}_*`: {count} columnas")
+        
+        with tab3:
+            st.write("**Información del DataFrame:**")
+            
+            buffer = io.StringIO()
+            data_final.info(buf=buffer)
+            info_str = buffer.getvalue()
+            st.text(info_str)
+            
+            st.write("**Estadísticas de variables numéricas:**")
+            st.dataframe(data_final.describe(), use_container_width=True)
+        
+        with tab4:
+            st.write("### Verificaciones de Calidad")
+            
+            # 1. Verificar desercion
+            st.write("**1. ¿Se creó la variable 'desercion'?**")
+            if 'desercion' in data_final.columns:
+                distribucion = data_final['desercion'].value_counts()
+                st.success("✅ Variable 'desercion' creada correctamente")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("No Deserción (0)", distribucion.get(0, 0))
+                with col2:
+                    st.metric("Deserción (1)", distribucion.get(1, 0))
                 
                 # Porcentaje
                 if len(data_final) > 0:
