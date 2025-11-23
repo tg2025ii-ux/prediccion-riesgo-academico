@@ -1,486 +1,593 @@
 """
-Componente Streamlit para AJUSTES FINALES
-Permite cargar base codificada y descargar base lista para predicción
+Data Processor AJUSTES FINALES - Dropout corrida y preparación para predicción
+Replica el proceso de ajuste de dropout y preparación final de columnas
+Recibe base codificada y retorna base lista para el modelo
 """
 
-import streamlit as st
 import pandas as pd
-import io
+import numpy as np
+from typing import Optional
 
-def seccion_ajustes():
+class DataProcessorAjustes:
     """
-    Sección de Streamlit para ajustes finales (dropout corrida)
+    Procesador que aplica ajustes finales:
+    - Elimina programas finalizados
+    - Calcula dropout corrida (deserción en próximo ciclo)
+    - Limpia y prepara columnas finales
+    - Ordena columnas según modelo
     """
-    st.header("🔧 AJUSTES FINALES (11 FASES)")
-    st.markdown("""
-    Esta sección aplica los ajustes finales a la base codificada:
     
-    **FASE 1: Eliminar Programas Finalizados**
-    - ✅ Filtrar Estado = "Programa Finalizado"
-    
-    **FASE 2-3: Calcular Dropout Corrida**
-    - ✅ Si último ciclo tiene Dropout=1, poner 0 a anteriores
-    - ✅ Ajustar dropout en último ciclo
-    
-    **FASE 4: Detectar Pausas Largas**
-    - ✅ Pausas ≥3 semestres → marcar como deserción
-    
-    **FASE 5: Crear Estado_next**
-    - ✅ Variable de predicción (deserción en próximo ciclo)
-    - ✅ Dos últimos ciclos → NaN
-    - ✅ Si último Dropout=1 → marcar dos ciclos antes
-    
-    **FASE 6: Validar con PER**
-    - ✅ Verificar continuidad con base PER original
-    
-    **FASE 7-8: Limpiar y Convertir**
-    - ✅ Renombrar columnas duplicadas
-    - ✅ Eliminar columnas innecesarias
-    - ✅ Convertir tipos de datos (bool→int8)
-    
-    **FASE 9: Filtrar Registros Válidos**
-    - ✅ Solo registros con Estado_next válido
-    - ✅ Renombrar Estado_next → desercion
-    
-    **FASE 10: Crear Rango Edad**
-    - ✅ Variable categórica de edad (0-3)
-    
-    **FASE 11: Aplicar Columnas del Modelo**
-    - ✅ Orden y selección de columnas exactas del modelo
-    
-    **Resultado**: Base final lista para predicción con modelo XGBoost
-    """)
-    
-    # Verificar archivos necesarios
-    import os
-    libro1_existe = os.path.exists("Libro1.xlsx")
-    
-    if libro1_existe:
-        st.success("✅ Archivo 'Libro1.xlsx' encontrado")
-    else:
-        st.warning("⚠️ Archivo 'Libro1.xlsx' no encontrado (opcional para columnas del modelo)")
-    
-    # Tabs para diferentes opciones
-    tab_upload, tab_session = st.tabs(["📤 Subir Base Codificada", "💾 Usar desde Sesión"])
-    
-    with tab_upload:
-        st.subheader("📤 Subir Base Codificada")
-        st.info("💡 Sube el archivo Excel o CSV generado en la pestaña de Encoding")
+    def __init__(self, per_original: Optional[pd.DataFrame] = None,
+                 columnas_modelo_path: Optional[str] = None):
+        """
+        Inicializa el procesador de ajustes
         
-        col1, col2 = st.columns(2)
+        Args:
+            per_original: DataFrame PER original (para validar continuidad)
+            columnas_modelo_path: Ruta al Excel con nombres de columnas del modelo
+        """
+        self.per_original = per_original
+        self.columnas_modelo = None
         
-        with col1:
-            archivo_encoded = st.file_uploader(
-                "Selecciona la base codificada",
-                type=['xlsx', 'xls', 'csv', 'pkl'],
-                help="Debe ser el resultado del proceso de encoding",
-                key="upload_encoded"
-            )
+        if columnas_modelo_path:
+            self._cargar_columnas_modelo(columnas_modelo_path)
         
-        with col2:
-            archivo_per = st.file_uploader(
-                "Selecciona PER original (opcional)",
-                type=['xlsx', 'xls', 'csv'],
-                help="Para validar continuidad de estudiantes",
-                key="upload_per"
-            )
+        print("✅ Procesador de Ajustes Finales inicializado")
+    
+    def _cargar_columnas_modelo(self, path: str):
+        """Carga el mapeo de columnas desde Excel"""
+        try:
+            nombres = pd.read_excel(path, sheet_name='Hoja3', header=None)
+            self.columnas_modelo = list(nombres[1])
+            print(f"   ✓ Columnas del modelo cargadas: {len(self.columnas_modelo)} columnas")
+        except Exception as e:
+            print(f"   ⚠️ Error al cargar columnas del modelo: {e}")
+            self.columnas_modelo = None
+    
+    def procesar(self, data_encoded: pd.DataFrame, 
+                 per_original: Optional[pd.DataFrame] = None,
+                 columnas_modelo_path: Optional[str] = None) -> pd.DataFrame:
+        """
+        Procesa la base codificada y aplica ajustes finales
         
-        if archivo_encoded is not None:
-            try:
-                with st.spinner("📂 Cargando archivo codificado..."):
-                    # Leer archivo
-                    if archivo_encoded.name.endswith('.pkl'):
-                        data_encoded = pd.read_pickle(archivo_encoded)
-                    elif archivo_encoded.name.endswith('.csv'):
-                        data_encoded = pd.read_csv(archivo_encoded)
+        Args:
+            data_encoded: DataFrame resultado del encoding
+            per_original: DataFrame PER original (opcional)
+            columnas_modelo_path: Ruta al Excel con columnas (opcional)
+            
+        Returns:
+            DataFrame listo para predicción
+        """
+        print("\n" + "="*80)
+        print("🔧 INICIANDO AJUSTES FINALES - DROPOUT CORRIDA")
+        print("="*80)
+        
+        # Actualizar PER si se proporciona
+        if per_original is not None:
+            self.per_original = per_original
+        
+        # Cargar columnas si se proporciona
+        if columnas_modelo_path and not self.columnas_modelo:
+            self._cargar_columnas_modelo(columnas_modelo_path)
+        
+        data = data_encoded.copy()
+        
+        # ========== FASE 1: ELIMINAR PROGRAMAS FINALIZADOS ==========
+        print("\n" + "="*80)
+        print("FASE 1: ELIMINAR PROGRAMAS FINALIZADOS")
+        print("="*80)
+        
+        data = self._eliminar_programas_finalizados(data)
+        
+        # ========== FASE 2: CALCULAR DROPOUT CORRIDA ==========
+        print("\n" + "="*80)
+        print("FASE 2: CALCULAR DROPOUT CORRIDA")
+        print("="*80)
+        
+        data = self._calcular_dropout_corrida(data)
+        
+        # ========== FASE 3: AJUSTAR ÚLTIMO CICLO CON DESERCIÓN ==========
+        print("\n" + "="*80)
+        print("FASE 3: AJUSTAR DROPOUT EN ÚLTIMO CICLO")
+        print("="*80)
+        
+        data = self._ajustar_dropout_ultimo_ciclo(data)
+        
+        # ========== FASE 4: DETECTAR PAUSAS LARGAS ==========
+        print("\n" + "="*80)
+        print("FASE 4: DETECTAR PAUSAS LARGAS (≥3 SEMESTRES)")
+        print("="*80)
+        
+        data = self._detectar_pausas_largas(data)
+        
+        # ========== FASE 5: CREAR ESTADO_NEXT ==========
+        print("\n" + "="*80)
+        print("FASE 5: CREAR ESTADO_NEXT (PREDICCIÓN)")
+        print("="*80)
+        
+        data = self._crear_estado_next(data)
+        
+        # ========== FASE 6: VALIDAR CON PER ORIGINAL ==========
+        print("\n" + "="*80)
+        print("FASE 6: VALIDAR CONTINUIDAD CON PER")
+        print("="*80)
+        
+        data = self._validar_con_per(data)
+        
+        # ========== FASE 7: RENOMBRAR Y LIMPIAR COLUMNAS ==========
+        print("\n" + "="*80)
+        print("FASE 7: RENOMBRAR Y LIMPIAR COLUMNAS")
+        print("="*80)
+        
+        data = self._renombrar_y_limpiar_columnas(data)
+        
+        # ========== FASE 8: CONVERTIR TIPOS DE DATOS ==========
+        print("\n" + "="*80)
+        print("FASE 8: CONVERTIR TIPOS DE DATOS")
+        print("="*80)
+        
+        data = self._convertir_tipos_datos(data)
+        
+        # ========== FASE 9: ELIMINAR REGISTROS SIN ESTADO_NEXT ==========
+        print("\n" + "="*80)
+        print("FASE 9: FILTRAR REGISTROS VÁLIDOS")
+        print("="*80)
+        
+        data = self._filtrar_registros_validos(data)
+        
+        # ========== FASE 10: CREAR RANGO EDAD ==========
+        print("\n" + "="*80)
+        print("FASE 10: CREAR RANGO DE EDAD")
+        print("="*80)
+        
+        data = self._crear_rango_edad(data)
+        
+        # ========== FASE 11: APLICAR COLUMNAS DEL MODELO ==========
+        print("\n" + "="*80)
+        print("FASE 11: APLICAR COLUMNAS DEL MODELO")
+        print("="*80)
+        
+        data = self._aplicar_columnas_modelo(data)
+        
+        print("\n" + "="*80)
+        print(f"✅ AJUSTES COMPLETADOS")
+        print(f"   • Registros finales: {len(data)}")
+        print(f"   • Columnas finales: {len(data.columns)}")
+        print(f"   • Lista para predicción")
+        print("="*80)
+        
+        return data
+    
+    # ============================================================================
+    # FASE 1: ELIMINAR PROGRAMAS FINALIZADOS
+    # ============================================================================
+    
+    def _eliminar_programas_finalizados(self, data):
+        """Eliminar registros con Estado = 'Programa Finalizado'"""
+        print("\n🗑️ Eliminando programas finalizados...")
+        
+        if 'Estado' not in data.columns:
+            print("   ⚠️ Columna 'Estado' no encontrada")
+            return data
+        
+        registros_antes = len(data)
+        data = data[data['Estado'] != 'Programa Finalizado'].copy()
+        registros_despues = len(data)
+        
+        print(f"   ✓ Registros: {registros_antes} → {registros_despues} ({registros_antes - registros_despues} eliminados)")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 2: CALCULAR DROPOUT CORRIDA
+    # ============================================================================
+    
+    def _calcular_dropout_corrida(self, data):
+        """Si último ciclo tiene Dropout=1, poner 0 a todos los anteriores"""
+        print("\n🔄 Calculando dropout corrida...")
+        
+        if 'Estado (Dropout)' not in data.columns:
+            print("   ⚠️ Columna 'Estado (Dropout)' no encontrada")
+            return data
+        
+        # Identificar columnas p_
+        cols_p = [col for col in data.columns if col.startswith('p_')]
+        print(f"   ✓ Programas encontrados: {len(cols_p)}")
+        
+        # Ordenar por ID, Mult Programa y Ciclo
+        data = data.sort_values(by=['ID', 'Mult Programa', 'Ciclo'])
+        
+        ajustes_count = 0
+        
+        for col in cols_p:
+            mask_true = data[col] == 1
+            sub_data = data[mask_true]
+            grupos = sub_data.groupby(['ID', 'Mult Programa'])
+            
+            for (id_val, mp_val), group in grupos:
+                idx_max = group['Ciclo'].idxmax()
+                estado_final = data.loc[idx_max, 'Estado (Dropout)']
+                
+                if estado_final == 1:
+                    idx_anteriores = group[group['Ciclo'] < data.loc[idx_max, 'Ciclo']].index
+                    data.loc[idx_anteriores, 'Estado (Dropout)'] = 0
+                    ajustes_count += len(idx_anteriores)
+        
+        print(f"   ✓ Ajustes realizados: {ajustes_count} registros")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 3: AJUSTAR DROPOUT EN ÚLTIMO CICLO
+    # ============================================================================
+    
+    def _ajustar_dropout_ultimo_ciclo(self, data):
+        """Ajustar dropout en el último ciclo"""
+        print("\n🔧 Ajustando dropout en último ciclo...")
+        
+        # Esta fase ya está implícita en la anterior
+        print("   ✓ Ya aplicado en fase anterior")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 4: DETECTAR PAUSAS LARGAS
+    # ============================================================================
+    
+    def _detectar_pausas_largas(self, data):
+        """Detectar pausas de ≥3 semestres y marcar como deserción"""
+        print("\n⏸️ Detectando pausas largas (≥3 semestres)...")
+        
+        ciclos_ref = [
+            510, 530, 610, 630, 710, 730, 810, 830, 910, 930, 1010, 1030, 1110, 1130,
+            1210, 1230, 1310, 1330, 1410, 1430, 1510, 1530, 1610, 1630, 1710, 1730,
+            1810, 1830, 1910, 1930, 2010, 2030, 2110, 2130, 2210, 2230, 2310, 2330,
+            2410, 2430, 2510, 2530, 2610, 2630, 2710, 2730, 2810, 2830, 2910, 2930, 3010, 3030
+        ]
+        
+        cols_p = [col for col in data.columns if col.startswith('p_')]
+        data = data.sort_values(by=['ID', 'Mult Programa', 'Ciclo'])
+        
+        pausas_detectadas = 0
+        
+        for col in cols_p:
+            sub_data = data[data[col] == 1]
+            grupos = sub_data.groupby(['ID', 'Mult Programa'])
+            
+            for (id_val, mp_val), group in grupos:
+                ciclos_estudiante = sorted(group['Ciclo'].unique())
+                
+                for i in range(len(ciclos_estudiante) - 1):
+                    ciclo_actual = ciclos_estudiante[i]
+                    ciclo_siguiente = ciclos_estudiante[i + 1]
+                    
+                    if ciclo_actual not in ciclos_ref or ciclo_siguiente not in ciclos_ref:
+                        continue
+                    
+                    idx_actual = ciclos_ref.index(ciclo_actual)
+                    idx_siguiente = ciclos_ref.index(ciclo_siguiente)
+                    diferencia = idx_siguiente - idx_actual
+                    
+                    if diferencia >= 3:
+                        idx_mod = data[
+                            (data['ID'] == id_val) &
+                            (data['Mult Programa'] == mp_val) &
+                            (data['Ciclo'] == ciclo_actual) &
+                            (data[col] == 1)
+                        ].index
+                        data.loc[idx_mod, 'Estado (Dropout)'] = 1
+                        pausas_detectadas += len(idx_mod)
+        
+        print(f"   ✓ Pausas detectadas: {pausas_detectadas} registros marcados")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 5: CREAR ESTADO_NEXT
+    # ============================================================================
+    
+    def _crear_estado_next(self, data):
+        """Crear variable Estado_next (predicción del próximo ciclo)"""
+        print("\n🎯 Creando Estado_next...")
+        
+        cols_p = [c for c in data.columns if c.startswith('p_')]
+        data['Estado_next'] = 0
+        data = data.sort_values(['ID', 'Mult Programa', 'Ciclo']).reset_index(drop=True)
+        
+        for col_p in cols_p:
+            sub = data[data[col_p] == 1]
+            for (id_val, mp_val), group in sub.groupby(['ID', 'Mult Programa']):
+                ciclos_grupo = group['Ciclo'].to_list()
+                
+                if len(ciclos_grupo) == 0:
+                    continue
+                
+                # 1. Dos ciclos de mayor valor → NaN
+                top2_cycles = sorted(ciclos_grupo)[-2:] if len(ciclos_grupo) >= 2 else [max(ciclos_grupo)]
+                for ciclo_top in top2_cycles:
+                    idx_top = group[group['Ciclo'] == ciclo_top].index[0]
+                    data.loc[idx_top, 'Estado_next'] = np.nan
+                
+                max_cycle = max(top2_cycles)
+                
+                # 2. Si último tiene Dropout=1, marcar dos ciclos antes
+                if data.loc[idx_top, 'Estado (Dropout)'] == 1:
+                    ciclos_ordenados = sorted(ciclos_grupo)
+                    pos_desercion = ciclos_ordenados.index(max_cycle)
+                    
+                    if pos_desercion >= 2:
+                        ciclo_target = ciclos_ordenados[pos_desercion - 2]
+                        idx_target = group[group['Ciclo'] == ciclo_target].index[0]
+                        data.loc[idx_target, 'Estado_next'] = 1
                     else:
-                        data_encoded = pd.read_excel(archivo_encoded)
-                    
-                    st.success("✅ Base codificada cargada correctamente")
-                    
-                    # Mostrar información
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("📝 Registros", len(data_encoded))
-                    with col2:
-                        st.metric("📊 Columnas", len(data_encoded.columns))
-                    
-                    # Guardar en session_state
-                    st.session_state['data_encoded_upload'] = data_encoded
-                    st.session_state['source_ajustes'] = 'upload'
-            
-            except Exception as e:
-                st.error(f"❌ Error al leer el archivo: {str(e)}")
-                st.exception(e)
+                        anteriores = [c for c in ciclos_grupo if c < max_cycle]
+                        if len(anteriores) > 0:
+                            ciclo_target = max(anteriores)
+                            idx_prev = group[group['Ciclo'] == ciclo_target].index[0]
+                            data.loc[idx_prev, 'Estado_next'] = 1
+                
+                # 3. Pausas en ciclos menores
+                for i, ciclo in enumerate(ciclos_grupo):
+                    idx = group[group['Ciclo'] == ciclo].index[0]
+                    if ciclo < max_cycle and data.loc[idx, 'Estado (Dropout)'] == 1:
+                        data.loc[idx, 'Estado_next'] = 1
         
-        # Leer PER si se proporciona
-        if archivo_per is not None:
-            try:
-                with st.spinner("📂 Cargando PER original..."):
-                    if archivo_per.name.endswith('.csv'):
-                        per_original = pd.read_csv(archivo_per)
-                    else:
-                        per_original = pd.read_excel(archivo_per, sheet_name='PER')
-                    
-                    st.success("✅ PER original cargado")
-                    st.session_state['per_original_upload'] = per_original
-                    
-                    st.metric("📝 Registros PER", len(per_original))
-            
-            except Exception as e:
-                st.warning(f"⚠️ Error al leer PER: {str(e)}")
+        # Marcar penúltimo ciclo como 0
+        data["Ciclo"] = data["Ciclo"].astype(int)
+        ciclos_unicos = sorted(data['Ciclo'].unique())
+        
+        if len(ciclos_unicos) >= 2:
+            penultimo_ciclo = ciclos_unicos[-2]
+            data.loc[data['Ciclo'] == penultimo_ciclo, 'Estado_next'] = 0
+            print(f"   ✓ Penúltimo ciclo ({penultimo_ciclo}) marcado como 0")
+        
+        print(f"   ✓ Estado_next creado")
+        
+        return data
     
-    with tab_session:
-        st.subheader("💾 Usar Base Codificada de la Sesión")
-        
-        if 'data_encoded' in st.session_state:
-            data_encoded_session = st.session_state['data_encoded']
-            st.success("✅ Base codificada encontrada en la sesión actual")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("📝 Registros", len(data_encoded_session))
-            with col2:
-                st.metric("📊 Columnas", len(data_encoded_session.columns))
-            
-            if st.button("✅ Usar esta base", type="primary"):
-                st.session_state['data_encoded_upload'] = data_encoded_session
-                st.session_state['source_ajustes'] = 'session'
-                st.success("✅ Base cargada desde la sesión")
-                st.rerun()
-        else:
-            st.warning("⚠️ No hay base codificada en la sesión actual")
-            st.info("💡 Procesa primero el encoding en la pestaña 🎨 Encoding")
+    # ============================================================================
+    # FASE 6: VALIDAR CON PER
+    # ============================================================================
     
-    # Procesar si hay datos cargados
-    if 'data_encoded_upload' in st.session_state:
-        st.markdown("---")
+    def _validar_con_per(self, data):
+        """Validar continuidad con PER original"""
+        print("\n✅ Validando con PER original...")
         
-        data_encoded = st.session_state['data_encoded_upload']
-        source = st.session_state.get('source_ajustes', 'unknown')
+        if self.per_original is None:
+            print("   ⚠️ PER original no proporcionado, saltando validación")
+            return data
         
-        if source == 'upload':
-            st.info("📤 Usando base subida manualmente")
-        elif source == 'session':
-            st.info("💾 Usando base de la sesión de encoding")
+        # Crear columna Programa a partir de p_
+        data['Programa'] = data[[c for c in data.columns if c.startswith('p_')]].idxmax(axis=1).str.replace('p_', '')
         
-        # Opciones avanzadas
-        with st.expander("⚙️ Opciones Avanzadas", expanded=False):
-            usar_per = st.checkbox(
-                "Usar validación con PER original",
-                value='per_original_upload' in st.session_state,
-                help="Valida continuidad de estudiantes con base PER"
-            )
-            
-            usar_columnas_modelo = st.checkbox(
-                "Aplicar columnas del modelo (Libro1.xlsx)",
-                value=libro1_existe,
-                help="Ordena columnas según el modelo entrenado"
-            )
+        ciclos_unicos = sorted(data['Ciclo'].unique())
+        if len(ciclos_unicos) < 2:
+            print("   ⚠️ No hay suficientes ciclos para validación")
+            return data
         
-        # Mostrar vista previa
-        with st.expander("👁️ Vista previa de la base codificada", expanded=False):
-            st.dataframe(data_encoded.head(50), use_container_width=True, height=300)
+        ciclo_penultimo = ciclos_unicos[-2]
+        ciclo_max_per = self.per_original['Ciclo'].max()
         
-        # Botón para procesar
-        if st.button("🚀 PROCESAR AJUSTES FINALES", type="primary", use_container_width=True):
-            with st.spinner("⏳ Procesando ajustes finales (11 fases)..."):
-                # Capturar logs
-                import sys
-                from io import StringIO
-                
-                old_stdout = sys.stdout
-                sys.stdout = buffer = StringIO()
-                
-                try:
-                    # Preparar argumentos
-                    per_original = st.session_state.get('per_original_upload', None) if usar_per else None
-                    columnas_modelo_path = "Libro1.xlsx" if usar_columnas_modelo and libro1_existe else None
-                    
-                    # Procesar ajustes
-                    data_final = procesar_ajustes_completo(
-                        data_encoded, 
-                        per_original,
-                        columnas_modelo_path
-                    )
-                    
-                    # Obtener logs
-                    logs = buffer.getvalue()
-                    sys.stdout = old_stdout
-                    
-                    # Guardar en session_state
-                    st.session_state['data_final'] = data_final
-                    st.session_state['logs_ajustes'] = logs
-                    
-                except Exception as e:
-                    sys.stdout = old_stdout
-                    st.error(f"❌ Error durante los ajustes: {str(e)}")
-                    st.exception(e)
-                    return
-            
-            st.success("✅ Ajustes completados!")
-            st.balloons()
-            
-            # Mostrar logs
-            with st.expander("📋 Ver logs de procesamiento", expanded=True):
-                st.code(logs, language="text")
+        # IDs en ciclo máximo de PER
+        ids_max_per_prog = set(zip(
+            self.per_original.loc[self.per_original['Ciclo'] == ciclo_max_per, 'ID'],
+            self.per_original.loc[self.per_original['Ciclo'] == ciclo_max_per, 'Programa']
+        ))
+        
+        # IDs en penúltimo ciclo de data
+        ids_penultimo_data = set(zip(
+            data.loc[data['Ciclo'] == ciclo_penultimo, 'ID'],
+            data.loc[data['Ciclo'] == ciclo_penultimo, 'Programa']
+        ))
+        
+        # Los que NO están en PER son dropout
+        ids_no_en_per = ids_penultimo_data - ids_max_per_prog
+        
+        data.loc[data['Ciclo'] == ciclo_penultimo, 'Estado_next'] = data.loc[data['Ciclo'] == ciclo_penultimo].apply(
+            lambda row: 1 if (row['ID'], row['Programa']) in ids_no_en_per else np.nan,
+            axis=1
+        )
+        
+        print(f"   ✓ Validación completada: {len(ids_no_en_per)} deserciones detectadas")
+        
+        return data
     
-    # Mostrar resultados si existen
-    if 'data_final' in st.session_state:
-        st.markdown("---")
-        st.subheader("📊 Resultados de los Ajustes")
+    # ============================================================================
+    # FASE 7: RENOMBRAR Y LIMPIAR COLUMNAS
+    # ============================================================================
+    
+    def _renombrar_y_limpiar_columnas(self, data):
+        """Renombrar y eliminar columnas innecesarias"""
+        print("\n📝 Renombrando y limpiando columnas...")
         
-        data_final = st.session_state['data_final']
+        # Renombres
+        renombres = {
+            'Créditos Inscritos en Ciclo_prom': 'Créditos Inscritos en Ciclo',
+            'Créd.Inscritos y Aprobados Ciclo_prom': 'Créditos Inscritos y Aprobados Ciclo'
+        }
         
-        # Métricas principales
-        col1, col2, col3, col4 = st.columns(4)
+        data = data.rename(columns={k: v for k, v in renombres.items() if k in data.columns})
         
-        with col1:
-            st.metric("📝 Registros", len(data_final))
+        # Eliminar columnas
+        columnas_eliminar = [
+            'Créditos Inscritos en Ciclo_per',
+            'Créd.Inscritos y Aprobados Ciclo_per',
+            'Situacion Acad',
+            'Créd Inscritos xa PromedioCicl',
+            'Créd.Inscrtos Aprbdos PromCicl',
+            'Num_Materias_Ciclo'
+        ]
         
-        with col2:
-            st.metric("📊 Columnas", len(data_final.columns))
+        cols_found = [c for c in columnas_eliminar if c in data.columns]
+        if cols_found:
+            data = data.drop(columns=cols_found)
+            print(f"   ✓ Eliminadas: {len(cols_found)} columnas")
         
-        with col3:
-            # Verificar desercion
-            if 'desercion' in data_final.columns:
-                desercion_count = (data_final['desercion'] == 1).sum()
-                st.metric("⚠️ Deserción = 1", desercion_count)
+        # Eliminar pn_*
+        cols_pn = [c for c in data.columns if c.startswith('pn_')]
+        if cols_pn:
+            data = data.drop(columns=cols_pn)
+            print(f"   ✓ Eliminadas {len(cols_pn)} columnas pn_*")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 8: CONVERTIR TIPOS DE DATOS
+    # ============================================================================
+    
+    def _convertir_tipos_datos(self, data):
+        """Convertir tipos de datos a formatos eficientes"""
+        print("\n🔢 Convirtiendo tipos de datos...")
+        
+        # Convertir bool a int8
+        bool_cols = data.select_dtypes(include=['bool']).columns
+        if len(bool_cols) > 0:
+            data = data.astype({col: 'int8' for col in bool_cols})
+            print(f"   ✓ {len(bool_cols)} columnas bool → int8")
+        
+        # Convertir Ciclo a Int64
+        if 'Ciclo' in data.columns:
+            data['Ciclo'] = pd.to_numeric(data['Ciclo'], errors='coerce').astype('Int64')
+        
+        if 'Ciclo Admisión' in data.columns:
+            data['Ciclo Admisión'] = pd.to_numeric(data['Ciclo Admisión'], errors='coerce').astype('Int64')
+        
+        # Eliminar columnas object (excepto ID)
+        object_cols = data.select_dtypes(include=['object']).columns.tolist()
+        object_cols = [c for c in object_cols if c != 'ID']
+        
+        if object_cols:
+            data = data.drop(columns=object_cols)
+            print(f"   ✓ Eliminadas {len(object_cols)} columnas object")
+        
+        # Eliminar ID y Estado (Dropout)
+        cols_final_drop = ['ID', 'Estado (Dropout)', 'Estado', 'Programa']
+        cols_final_found = [c for c in cols_final_drop if c in data.columns]
+        if cols_final_found:
+            data = data.drop(columns=cols_final_found)
+            print(f"   ✓ Eliminadas: {cols_final_found}")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 9: FILTRAR REGISTROS VÁLIDOS
+    # ============================================================================
+    
+    def _filtrar_registros_validos(self, data):
+        """Filtrar solo registros con Estado_next válido"""
+        print("\n🔍 Filtrando registros válidos...")
+        
+        if 'Estado_next' not in data.columns:
+            print("   ⚠️ Columna 'Estado_next' no encontrada")
+            return data
+        
+        registros_antes = len(data)
+        data = data[~data['Estado_next'].isna()].copy()
+        registros_despues = len(data)
+        
+        # Renombrar a desercion
+        data = data.rename(columns={"Estado_next": "desercion"})
+        
+        print(f"   ✓ Registros: {registros_antes} → {registros_despues} ({registros_antes - registros_despues} eliminados)")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 10: CREAR RANGO EDAD
+    # ============================================================================
+    
+    def _crear_rango_edad(self, data):
+        """Crear variable rango_edad categórica"""
+        print("\n👥 Creando rango de edad...")
+        
+        if 'Edad' not in data.columns:
+            print("   ⚠️ Columna 'Edad' no encontrada")
+            return data
+        
+        def map_age_groups(age):
+            if age <= 19:
+                return 0  # 18-19
+            elif age <= 24:
+                return 1  # 20-24
+            elif age <= 34:
+                return 2  # 25-34
+            elif age <= 49:
+                return 3  # 35-49
             else:
-                st.metric("⚠️ Deserción", "N/A")
+                return 4  # ≥50
         
-        with col4:
-            # Memoria del DataFrame
-            memoria_mb = data_final.memory_usage(deep=True).sum() / 1024**2
-            st.metric("💾 Tamaño", f"{memoria_mb:.1f} MB")
+        data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
+        data['rango_edad'] = data['rango_edad'].replace(4, 3)
         
-        # Tabs para explorar
-        tab1, tab2, tab3, tab4 = st.tabs(["👁️ Vista Previa", "📋 Columnas", "📊 Estadísticas", "⚠️ Verificaciones"])
+        distribucion = data['rango_edad'].value_counts().sort_index()
+        print(f"   ✓ Rango edad creado:")
+        for rango, count in distribucion.items():
+            print(f"      - Rango {rango}: {count} registros")
         
-        with tab1:
-            st.write("**Primeras 100 filas:**")
-            st.dataframe(
-                data_final.head(100),
-                use_container_width=True,
-                height=400
-            )
+        return data
+    
+    # ============================================================================
+    # FASE 11: APLICAR COLUMNAS DEL MODELO
+    # ============================================================================
+    
+    def _aplicar_columnas_modelo(self, data):
+        """Aplicar orden y selección de columnas del modelo"""
+        print("\n📋 Aplicando columnas del modelo...")
         
-        with tab2:
-            st.write("### Lista de Columnas")
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                # Mostrar todas las columnas
-                columnas_df = pd.DataFrame({
-                    'Columna': data_final.columns,
-                    'Tipo': data_final.dtypes.astype(str),
-                    'No Nulos': data_final.count().values,
-                    'Nulos': data_final.isnull().sum().values
-                })
-                st.dataframe(columnas_df, use_container_width=True, height=600)
-            
-            with col2:
-                # Resumen por tipo
-                st.write("**Tipos de datos:**")
-                tipos = data_final.dtypes.value_counts()
-                for tipo, count in tipos.items():
-                    st.write(f"• `{tipo}`: {count} columnas")
-                
-                # Prefijos
-                st.write("\n**Prefijos:**")
-                prefijos = {}
-                for col in data_final.columns:
-                    if '_' in col:
-                        prefijo = col.split('_')[0]
-                        prefijos[prefijo] = prefijos.get(prefijo, 0) + 1
-                
-                for prefijo, count in sorted(prefijos.items()):
-                    st.write(f"• `{prefijo}_*`: {count} columnas")
+        if not self.columnas_modelo:
+            print("   ⚠️ Columnas del modelo no cargadas")
+            return data
         
-        with tab3:
-            st.write("**Información del DataFrame:**")
-            
-            buffer = io.StringIO()
-            data_final.info(buf=buffer)
-            info_str = buffer.getvalue()
-            st.text(info_str)
-            
-            st.write("**Estadísticas de variables numéricas:**")
-            st.dataframe(data_final.describe(), use_container_width=True)
+        # Eliminar 'desercion' de columnas_modelo si existe
+        data = data.drop(columns=['desercion'], errors='ignore')
         
-        with tab4:
-            st.write("### Verificaciones de Calidad")
-            
-            # 1. Verificar desercion
-            st.write("**1. ¿Se creó la variable 'desercion'?**")
-            if 'desercion' in data_final.columns:
-                distribucion = data_final['desercion'].value_counts()
-                st.success("✅ Variable 'desercion' creada correctamente")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("No Deserción (0)", distribucion.get(0, 0))
-                with col2:
-                    st.metric("Deserción (1)", distribucion.get(1, 0))
-                
-                # Porcentaje
-                if len(data_final) > 0:
-                    porcentaje = (distribucion.get(1, 0) / len(data_final)) * 100
-                    st.write(f"   📊 Tasa de deserción: **{porcentaje:.2f}%**")
-            else:
-                st.error("❌ Variable 'desercion' NO fue creada")
-            
-            # 2. Verificar rango_edad
-            st.write("**2. ¿Se creó 'rango_edad'?**")
-            if 'rango_edad' in data_final.columns:
-                valores = sorted(data_final['rango_edad'].unique())
-                st.success(f"✅ rango_edad creada con valores: {valores}")
-                distribucion = data_final['rango_edad'].value_counts().sort_index()
-                st.write(distribucion.to_dict())
-            else:
-                st.warning("⚠️ rango_edad NO fue creada")
-            
-            # 3. Verificar que no hay NaN en desercion
-            st.write("**3. ¿Hay valores NaN en 'desercion'?**")
-            if 'desercion' in data_final.columns:
-                nulos = data_final['desercion'].isna().sum()
-                if nulos == 0:
-                    st.success("✅ No hay valores NaN en desercion")
-                else:
-                    st.error(f"❌ Hay {nulos} valores NaN en desercion")
-            
-            # 4. Verificar tipos de datos
-            st.write("**4. Tipos de datos:**")
-            tipos = data_final.dtypes.value_counts()
-            st.write(tipos.to_dict())
-            
-            # Verificar que no hay object
-            cols_object = data_final.select_dtypes(include=['object']).columns.tolist()
-            if cols_object:
-                st.warning(f"⚠️ {len(cols_object)} columnas tipo 'object':")
-                st.write(cols_object[:10])
-            else:
-                st.success("✅ No hay columnas tipo 'object'")
-            
-            # 5. Verificar que se eliminaron columnas innecesarias
-            st.write("**5. Columnas eliminadas correctamente:**")
-            
-            cols_que_no_deben_existir = [
-                'ID', 'Estado', 'Estado (Dropout)', 'Programa',
-                'Situacion Acad', 'Estado_next'
-            ]
-            
-            cols_encontradas = [c for c in cols_que_no_deben_existir if c in data_final.columns]
-            
-            if not cols_encontradas:
-                st.success("✅ Todas las columnas innecesarias fueron eliminadas")
-            else:
-                st.warning(f"⚠️ Aún existen {len(cols_encontradas)} columnas:")
-                st.write(cols_encontradas)
-            
-            # 6. Distribución de columnas dummy
-            st.write("**6. Variables Dummy:**")
-            
-            prefijos_dummy = ['p_', 's_', 'cd_', 'dn_', 'ccmax_', 'ccmin_', 'ta_']
-            total_dummies = 0
-            
-            for prefijo in prefijos_dummy:
-                cols = [c for c in data_final.columns if c.startswith(prefijo)]
-                if cols:
-                    total_dummies += len(cols)
-                    st.write(f"   • `{prefijo}*`: {len(cols)} columnas")
-            
-            st.write(f"   **Total dummies**: {total_dummies}")
-            
-            # 7. Verificar balance de clases
-            st.write("**7. Balance de Clases (desercion):**")
-            if 'desercion' in data_final.columns:
-                distribucion = data_final['desercion'].value_counts()
-                total = len(data_final)
-                
-                for valor in [0, 1]:
-                    count = distribucion.get(valor, 0)
-                    porcentaje = (count / total) * 100 if total > 0 else 0
-                    st.write(f"   • Clase {valor}: {count:,} ({porcentaje:.2f}%)")
-                
-                # Advertencia si está muy desbalanceado
-                if total > 0:
-                    min_class = min(distribucion.get(0, 0), distribucion.get(1, 0))
-                    max_class = max(distribucion.get(0, 0), distribucion.get(1, 0))
-                    ratio = max_class / min_class if min_class > 0 else float('inf')
-                    
-                    if ratio > 10:
-                        st.warning(f"⚠️ Clases muy desbalanceadas (ratio: {ratio:.1f}:1)")
-                    else:
-                        st.success(f"✅ Balance aceptable (ratio: {ratio:.1f}:1)")
+        # Renombrar usando Libro1.xlsx Hoja3 si está disponible
+        # (esto se hizo en el código original pero no tenemos el mapeo aquí)
         
-        # Botones de descarga
-        st.markdown("---")
-        st.subheader("📥 Descargar Base Final")
+        # Columnas existentes
+        cols_existentes = [col for col in self.columnas_modelo if col in data.columns]
         
-        col1, col2, col3 = st.columns(3)
+        # Columnas con "_" que no existen → crear con 0
+        cols_a_crear = [col for col in self.columnas_modelo if "_" in col and col not in data.columns]
         
-        with col1:
-            # Descargar como Excel
-            buffer_excel = io.BytesIO()
-            with pd.ExcelWriter(buffer_excel, engine='openpyxl') as writer:
-                data_final.to_excel(writer, index=False, sheet_name='Base Final')
-            
-            st.download_button(
-                label="📊 Descargar Excel",
-                data=buffer_excel.getvalue(),
-                file_name="base_final_prediccion.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+        for col in cols_a_crear:
+            data[col] = 0
         
-        with col2:
-            # Descargar como CSV
-            csv = data_final.to_csv(index=False)
-            st.download_button(
-                label="📄 Descargar CSV",
-                data=csv,
-                file_name="base_final_prediccion.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+        # Ordenar según columnas_modelo
+        data = data[cols_existentes + cols_a_crear]
         
-        with col3:
-            # Descargar como Pickle
-            buffer_pickle = io.BytesIO()
-            data_final.to_pickle(buffer_pickle)
-            st.download_button(
-                label="🗜️ Descargar Pickle",
-                data=buffer_pickle.getvalue(),
-                file_name="base_final_prediccion.pkl",
-                mime="application/octet-stream",
-                use_container_width=True
-            )
+        print(f"   ✓ Columnas aplicadas: {len(data.columns)} columnas")
+        print(f"      - Existentes: {len(cols_existentes)}")
+        print(f"      - Creadas (con 0): {len(cols_a_crear)}")
         
-        # Información adicional
-        st.success("""
-        ✅ **Base lista para predicción con modelo XGBoost**
-        
-        Esta base incluye:
-        - Variable objetivo: `desercion` (0/1)
-        - Todas las variables dummy codificadas
-        - Variables numéricas normalizadas
-        - Sin valores nulos en columnas críticas
-        - Formato optimizado para el modelo
-        """)
+        return data
 
 
 # =============================================================================
-# INTEGRACIÓN CON APP PRINCIPAL
+# FUNCIÓN PRINCIPAL PARA STREAMLIT
+# =============================================================================
+
+def procesar_ajustes_completo(data_encoded_df, per_original_df=None, columnas_modelo_path=None):
+    """
+    Función para usar en Streamlit que procesa ajustes finales
+    
+    Args:
+        data_encoded_df: DataFrame resultado del encoding
+        per_original_df: DataFrame PER original (opcional, para validación)
+        columnas_modelo_path: Ruta al Excel con columnas del modelo (opcional)
+        
+    Returns:
+        DataFrame listo para predicción
+    """
+    procesador = DataProcessorAjustes(per_original_df, columnas_modelo_path)
+    data_final = procesador.procesar(data_encoded_df)
+    return data_final
+
+
+# =============================================================================
+# EJEMPLO DE USO
 # =============================================================================
 
 if __name__ == "__main__":
-    st.set_page_config(
-        page_title="Ajustes Finales",
-        page_icon="🔧",
-        layout="wide"
-    )
-    
-    st.title("🔧 Procesador de Ajustes Finales - 11 Fases")
-    
-    seccion_ajustes()
+    procesador = DataProcessorAjustes()
+    print("\n✅ Procesador de ajustes listo")
