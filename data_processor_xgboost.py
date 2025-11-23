@@ -77,30 +77,66 @@ class DataProcessorXGBoost:
     def _descargar_modelo(self):
         """
         Descarga el modelo desde Google Drive si no existe localmente
+        MÉTODO ALTERNATIVO: Usar descarga directa sin gdown
         """
-        try:
-            import gdown
-        except ImportError:
-            print("❌ Error: gdown no está instalado")
-            print("   Ejecuta: pip install gdown")
-            return
-        
         modelo_path = 'xgboost_modelo.pkl'
         
         if not os.path.exists(modelo_path):
             print("⬇️ Descargando modelo desde Google Drive...")
             print("   Tamaño: ~142 MB - Esto puede tomar 1-2 minutos")
             
-            # ID del archivo en Google Drive
-            file_id = "1VLySTpc2m4soxTEjTi7xUSJcXyrF00JF"
-            url = f"https://drive.google.com/uc?id={file_id}"
-            
             try:
-                gdown.download(url, modelo_path, quiet=False)
-                print("✅ Modelo descargado exitosamente")
+                import gdown
+                
+                # ID del archivo en Google Drive
+                file_id = "1VLySTpc2m4soxTEjTi7xUSJcXyrF00JF"
+                
+                # Método 1: Intentar con gdown normal
+                url = f"https://drive.google.com/uc?id={file_id}"
+                
+                try:
+                    gdown.download(url, modelo_path, quiet=False, fuzzy=True)
+                    print("✅ Modelo descargado exitosamente")
+                    return
+                except Exception as e1:
+                    print(f"⚠️ Método 1 falló: {str(e1)}")
+                    
+                    # Método 2: Intentar con cached download
+                    try:
+                        gdown.cached_download(url, modelo_path, quiet=False)
+                        print("✅ Modelo descargado exitosamente (método 2)")
+                        return
+                    except Exception as e2:
+                        print(f"⚠️ Método 2 falló: {str(e2)}")
+                        
+                        # Método 3: Descarga con requests
+                        print("   Intentando método 3 (requests)...")
+                        import requests
+                        
+                        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+                        
+                        session = requests.Session()
+                        response = session.get(download_url, stream=True)
+                        
+                        # Manejar archivos grandes con confirmación
+                        for key, value in response.cookies.items():
+                            if key.startswith('download_warning'):
+                                download_url = f"https://drive.google.com/uc?export=download&confirm={value}&id={file_id}"
+                                response = session.get(download_url, stream=True)
+                                break
+                        
+                        # Guardar archivo
+                        with open(modelo_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=32768):
+                                if chunk:
+                                    f.write(chunk)
+                        
+                        print("✅ Modelo descargado exitosamente (método 3)")
+                        
             except Exception as e:
                 print(f"❌ Error descargando: {str(e)}")
-                print("   Verifica que el enlace de Google Drive sea público")
+                print("   Solución: Sube el archivo 'xgboost_modelo.pkl' manualmente")
+                print("   al repositorio de GitHub (raíz del proyecto)")
         else:
             print("✅ Modelo ya existe localmente")
     
@@ -185,10 +221,10 @@ class DataProcessorXGBoost:
         print("  📋 Procesando NOTAS...")
         print(f"    📌 Columnas ANTES del rename: {list(notas.columns)}")
         
-        # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
+        # PASO 1: RENOMBRAR COLUMNAS (NOMBRES EXACTOS del Excel del usuario)
         rename_dict = {
-            'Grado_Academico': 'Mult Programa',
-            'Programa_Academico_Base': 'Programa',
+            'Grado Académico': 'Mult Programa',  # ← CORREGIDO (con acento y espacio)
+            'Programa Académico Base': 'Programa',  # ← CORREGIDO (con espacio)
             'Promedio_Ciclo': 'Promedio Ciclo',
             'Estado.1': 'Estado Clase'
         }
