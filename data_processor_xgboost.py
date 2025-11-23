@@ -184,24 +184,28 @@ class DataProcessorXGBoost:
         """Procesa la base NOTAS"""
         print("  📋 Procesando NOTAS...")
         
-        # Renombrar columnas
-        if 'Estado.1' in notas.columns:
-            notas.rename(columns={'Estado.1': 'Estado Clase'}, inplace=True)
+        # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
+        rename_dict = {
+            'Grado_Academico': 'Mult Programa',
+            'Programa_Academico_Base': 'Programa',
+            'Promedio_Ciclo': 'Promedio Ciclo',
+            'Estado.1': 'Estado Clase'
+        }
+        notas.rename(columns=rename_dict, inplace=True)
         
-        # Eliminar columnas innecesarias
+        # PASO 2: Eliminar columnas innecesarias
         cols_drop = ['Nombre', 'Nº Oferta', 'Nº Clase', 'Sesión', 'Sección', 'Motivo']
         notas.drop(columns=[c for c in cols_drop if c in notas.columns], inplace=True)
         
-        # Agrupar y crear métricas
-        if all(c in notas.columns for c in ['ID', 'Programa Académico Base', 'Ciclo']):
-            grouped = notas.groupby(["ID", "Programa Académico Base", "Ciclo"]).agg(
+        # PASO 3: Agrupar y crear métricas
+        if all(c in notas.columns for c in ['ID', 'Programa', 'Ciclo']):
+            grouped = notas.groupby(["ID", "Programa", "Ciclo"]).agg(
                 Num_Materias_Ciclo=("ID", "count"),
                 Cant_Perdidas=("Calif", lambda x: (x < 3).sum() if 'Calif' in notas.columns else 0),
                 Materias_Vistas=("Estado", lambda x: (x == "E").sum() if 'Estado' in notas.columns else 0)
             ).reset_index()
             
-            # Hacer merge con las métricas calculadas
-            notas = notas.merge(grouped, on=["ID", "Programa Académico Base", "Ciclo"], how="left")
+            notas = notas.merge(grouped, on=["ID", "Programa", "Ciclo"], how="left")
         
         print(f"    ✓ NOTAS procesadas: {len(notas)} registros")
         return notas
@@ -209,6 +213,19 @@ class DataProcessorXGBoost:
     def _procesar_per(self, per):
         """Procesa la base PER"""
         print("  👤 Procesando PER...")
+        
+        # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
+        rename_dict = {
+            'Grado Académico': 'Mult Programa',
+            'Matrd Progr': 'Créditos Inscritos en Ciclo',
+            'Cred. Aprob.': 'Créd.Inscritos y Aprobados Ciclo',
+            'Ccl Admis': 'Ciclo Admisión',
+            'Lugar Nacimiento': 'Ciudad Nacimiento',
+            'Acc Prog': 'Acción',
+            'Motivo Acción': 'Motivo'
+        }
+        per.rename(columns=rename_dict, inplace=True)
+        
         per_original = per.copy()  # Guardar copia original
         print(f"    ✓ PER procesada: {len(per)} registros")
         return per, per_original
@@ -216,6 +233,18 @@ class DataProcessorXGBoost:
     def _procesar_prom(self, prom):
         """Procesa la base PROM"""
         print("  📈 Procesando PROM...")
+        
+        # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
+        rename_dict = {
+            'Grado': 'Mult Programa',
+            'Situacion Academica': 'Situacion Acad',
+            'Créd.Inscrtos y Aprobdos Ciclo': 'Créd.Inscritos y Aprobados Ciclo',
+            'Estado Programa Académico': 'Estado',
+            'Acción Programa': 'Acción',
+            'Motivo Accion': 'Motivo'
+        }
+        prom.rename(columns=rename_dict, inplace=True)
+        
         print(f"    ✓ PROM procesada: {len(prom)} registros")
         return prom
     
@@ -223,9 +252,22 @@ class DataProcessorXGBoost:
         """Procesa la base ADM"""
         print("  🎓 Procesando ADM...")
         
-        # Filtrar solo estudiantes activos
-        if 'Estado.1' in adm.columns:
-            adm = adm[adm["Estado.1"] == "Activo en Programa"].copy()
+        # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
+        rename_dict = {
+            'Ciclo': 'Ciclo Admisión',
+            'País': 'País Nacimiento',
+            'Estado': 'Dpto Nacimiento',
+            'Programa Académico': 'Programa',
+            'Ciudad': 'Ciudad (Dirección)',
+            'ID Org Ext': 'ID Colegio',
+            'Descr': 'Colegio',
+            'Estado.1': 'Estado'
+        }
+        adm.rename(columns=rename_dict, inplace=True)
+        
+        # PASO 2: Filtrar solo estudiantes activos
+        if 'Estado' in adm.columns:
+            adm = adm[adm["Estado"] == "Activo en Programa"].copy()
             print(f"    → Filtrados estudiantes activos")
         
         print(f"    ✓ ADM procesada: {len(adm)} registros")
