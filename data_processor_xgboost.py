@@ -444,12 +444,16 @@ class DataProcessorXGBoost:
             
             # Si existe versión _per, usarla y eliminar las demás
             if col_per in data.columns:
+                cols_to_drop = []
                 if col_prom in data.columns:
-                    data.drop(columns=[col_prom], inplace=True, errors='ignore')
+                    cols_to_drop.append(col_prom)
                 if col_adm in data.columns:
-                    data.drop(columns=[col_adm], inplace=True, errors='ignore')
+                    cols_to_drop.append(col_adm)
                 if col_ppn in data.columns:
-                    data.drop(columns=[col_ppn], inplace=True, errors='ignore')
+                    cols_to_drop.append(col_ppn)
+                
+                if cols_to_drop:
+                    data.drop(columns=cols_to_drop, inplace=True, errors='ignore')
                 
                 # Renombrar _per al nombre base
                 data.rename(columns={col_per: col_base}, inplace=True)
@@ -457,7 +461,15 @@ class DataProcessorXGBoost:
         # PASO 2: Resolver Estado, Acción, Motivo (preferir _per)
         for col in ['Estado', 'Acción', 'Motivo']:
             if f"{col}_per" in data.columns:
-                data.drop(columns=[f"{col}_prom", f"{col}_ppn"], inplace=True, errors='ignore')
+                cols_to_drop = []
+                if f"{col}_prom" in data.columns:
+                    cols_to_drop.append(f"{col}_prom")
+                if f"{col}_ppn" in data.columns:
+                    cols_to_drop.append(f"{col}_ppn")
+                
+                if cols_to_drop:
+                    data.drop(columns=cols_to_drop, inplace=True, errors='ignore')
+                
                 data.rename(columns={f"{col}_per": col}, inplace=True)
         
         # PASO 3: Eliminar columnas específicas innecesarias
@@ -508,61 +520,73 @@ class DataProcessorXGBoost:
             'Año', 'Año_per', 'Año_prom'
         ]
         
-        data.drop(columns=[c for c in cols_eliminar if c in data.columns], 
-                 inplace=True, errors='ignore')
+        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
+        if cols_encontradas:
+            data.drop(columns=cols_encontradas, inplace=True)
         
         # PASO 4: Eliminar TODAS las columnas con sufijos duplicados que queden
-        columnas_a_eliminar = []
-        for col in data.columns:
-            if any(col.endswith(suffix) for suffix in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas']):
-                columnas_a_eliminar.append(col)
+        columnas_a_eliminar = [col for col in data.columns 
+                              if any(col.endswith(suffix) for suffix in 
+                                    ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
         
         if columnas_a_eliminar:
             print(f"       → Eliminando columnas duplicadas: {len(columnas_a_eliminar)}")
-            data.drop(columns=columnas_a_eliminar, inplace=True, errors='ignore')
+            data.drop(columns=columnas_a_eliminar, inplace=True)
         
         # PASO 5: Convertir columnas de texto restantes a dummies
-        # Identificar columnas tipo object (texto) que no sean numéricas
         columnas_texto = data.select_dtypes(include=['object']).columns.tolist()
         
         if columnas_texto:
-            print(f"       → Columnas de texto encontradas: {columnas_texto}")
+            print(f"       → Columnas de texto encontradas: {len(columnas_texto)}")
             
-            # Convertir a dummies solo si tiene pocos valores únicos (categóricas)
             for col in columnas_texto:
-                n_unique = data[col].nunique()
-                
-                if n_unique <= 50:  # Solo categorizar si tiene menos de 50 valores únicos
-                    print(f"          Convirtiendo '{col}' a dummies ({n_unique} valores)")
-                    dummies = pd.get_dummies(data[col], prefix=col, drop_first=True)
-                    data = pd.concat([data, dummies], axis=1)
-                    data.drop(columns=[col], inplace=True)
-                else:
-                    print(f"          Eliminando '{col}' (demasiados valores: {n_unique})")
-                    data.drop(columns=[col], inplace=True)
+                try:
+                    n_unique = data[col].nunique()
+                    
+                    if n_unique <= 50:
+                        print(f"          Convirtiendo '{col}' a dummies ({n_unique} valores)")
+                        dummies = pd.get_dummies(data[col], prefix=col, drop_first=True)
+                        data = pd.concat([data, dummies], axis=1)
+                        data.drop(columns=[col], inplace=True)
+                    else:
+                        print(f"          Eliminando '{col}' (demasiados valores: {n_unique})")
+                        data.drop(columns=[col], inplace=True)
+                except Exception as e:
+                    print(f"          Error procesando '{col}': {str(e)}, eliminando...")
+                    data.drop(columns=[col], inplace=True, errors='ignore')
         
-        # PASO 6: Convertir columnas de fecha a número (días desde una fecha base)
+        # PASO 6: Convertir columnas de fecha a número
         columnas_fecha = data.select_dtypes(include=['datetime64']).columns.tolist()
         
         if columnas_fecha:
-            print(f"       → Convirtiendo fechas a días: {columnas_fecha}")
+            print(f"       → Convirtiendo {len(columnas_fecha)} columnas de fecha a días")
             for col in columnas_fecha:
-                # Convertir a días desde 1970-01-01
-                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
+                try:
+                    data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
+                    data[col].fillna(0, inplace=True)
+                except Exception as e:
+                    print(f"          Error convirtiendo '{col}': {str(e)}, eliminando...")
+                    data.drop(columns=[col], inplace=True, errors='ignore')
         
         # PASO 7: Asegurar que TODAS las columnas sean numéricas
+        columnas_no_numericas = []
         for col in data.columns:
             if data[col].dtype == 'object':
-                print(f"       ⚠️  Columna '{col}' sigue siendo texto, intentando convertir...")
+                columnas_no_numericas.append(col)
+        
+        if columnas_no_numericas:
+            print(f"       ⚠️  {len(columnas_no_numericas)} columnas siguen siendo texto, intentando convertir...")
+            for col in columnas_no_numericas:
                 try:
                     data[col] = pd.to_numeric(data[col], errors='coerce')
                     data[col].fillna(0, inplace=True)
-                except:
-                    print(f"       ❌ No se pudo convertir '{col}', eliminando...")
-                    data.drop(columns=[col], inplace=True)
+                except Exception as e:
+                    print(f"          ❌ No se pudo convertir '{col}', eliminando...")
+                    data.drop(columns=[col], inplace=True, errors='ignore')
         
         print(f"       ✓ Columnas después: {len(data.columns)}")
-        print(f"       ✓ Tipos de datos: {data.dtypes.value_counts().to_dict()}")
+        tipos = data.dtypes.value_counts().to_dict()
+        print(f"       ✓ Tipos de datos: {tipos}")
         
         return data
     
