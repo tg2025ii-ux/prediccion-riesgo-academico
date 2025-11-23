@@ -6,7 +6,6 @@ Permite cargar base codificada y descargar base lista para predicción
 import streamlit as st
 import pandas as pd
 import io
-from data_processor_ajustes import DataProcessorAjustes, procesar_ajustes_completo
 
 def seccion_ajustes():
     """
