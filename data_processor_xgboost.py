@@ -428,6 +428,200 @@ class DataProcessorXGBoost:
         return data_final
     
     def _limpieza_final(self, data):
+        """
+        Limpia y codifica variables siguiendo el Pipeline__2_ exactamente
+        Genera las 157 features que el modelo XGBoost espera
+        """
+        
+        print("    🧹 Iniciando limpieza y encoding final...")
+        print(f"       Columnas antes: {len(data.columns)}")
+        
+        # PASO 1: Resolver columnas duplicadas ANTES de encoding
+        # Mantener solo las versiones _per o sin sufijo
+        for col_base in ['Sexo', 'Colegio', 'Dpto Nacimiento', 'País Nacimiento',
+                         'Ciudad (Dirección)', 'Acción', 'Motivo']:
+            
+            # Buscar todas las versiones
+            col_per = f"{col_base}_per"
+            col_prom = f"{col_base}_prom" 
+            col_adm = f"{col_base}_adm"
+            col_ppn = f"{col_base}_ppn"
+            
+            # Si existe _per, usar esa
+            if col_per in data.columns:
+                data.rename(columns={col_per: col_base}, inplace=True)
+                # Eliminar otras versiones
+                for col in [col_prom, col_adm, col_ppn]:
+                    if col in data.columns:
+                        data.drop(columns=[col], inplace=True)
+            # Si no existe _per pero existe _ppn, usar esa
+            elif col_ppn in data.columns:
+                data.rename(columns={col_ppn: col_base}, inplace=True)
+                for col in [col_prom, col_adm]:
+                    if col in data.columns:
+                        data.drop(columns=[col], inplace=True)
+        
+        # PASO 2: ENCODING - Crear variables dummy (SIGUIENDO EL PIPELINE)
+        
+        # 2.1 Tipo Admisión → ta_
+        if 'Tipo Admisión' in data.columns:
+            print("       → Encoding: Tipo Admisión")
+            dummies = pd.get_dummies(data['Tipo Admisión'], prefix='ta')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Tipo Admisión'], inplace=True)
+        
+        # 2.2 Programa → p_
+        if 'Programa' in data.columns:
+            print("       → Encoding: Programa")
+            dummies = pd.get_dummies(data['Programa'], prefix='p')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Programa'], inplace=True)
+        
+        # 2.3 Siglas Prog → s_
+        if 'Siglas Prog' in data.columns:
+            print("       → Encoding: Siglas Prog")
+            dummies = pd.get_dummies(data['Siglas Prog'], prefix='s')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Siglas Prog'], inplace=True)
+        
+        # 2.4 Ciudad (Dirección) → cd_
+        if 'Ciudad (Dirección)' in data.columns:
+            print("       → Encoding: Ciudad (Dirección)")
+            dummies = pd.get_dummies(data['Ciudad (Dirección)'], prefix='cd')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Ciudad (Dirección)'], inplace=True)
+        
+        # 2.5 Dpto Nacimiento → dn_
+        if 'Dpto Nacimiento' in data.columns:
+            print("       → Encoding: Dpto Nacimiento")
+            dummies = pd.get_dummies(data['Dpto Nacimiento'], prefix='dn')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Dpto Nacimiento'], inplace=True)
+        
+        # 2.6 País Nacimiento → pn_
+        if 'País Nacimiento' in data.columns:
+            print("       → Encoding: País Nacimiento")
+            dummies = pd.get_dummies(data['País Nacimiento'], prefix='pn')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['País Nacimiento'], inplace=True)
+        
+        # 2.7 Acción → a_
+        if 'Acción' in data.columns:
+            print("       → Encoding: Acción")
+            dummies = pd.get_dummies(data['Acción'], prefix='a')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Acción'], inplace=True)
+        
+        # 2.8 Motivo → m_
+        if 'Motivo' in data.columns:
+            print("       → Encoding: Motivo")
+            dummies = pd.get_dummies(data['Motivo'], prefix='m')
+            data = pd.concat([data, dummies], axis=1)
+            data.drop(columns=['Motivo'], inplace=True)
+        
+        # 2.9 Sexo → numérico (1 = Masculino, 0 = Femenino)
+        if 'Sexo' in data.columns:
+            print("       → Encoding: Sexo")
+            data['Sexo'] = data['Sexo'].replace({'Masculino': 1, 'Femenino': 0})
+        
+        # 2.10 Edad → rangos (según map_age_groups del pipeline)
+        if 'Edad' in data.columns:
+            print("       → Encoding: Edad (rangos)")
+            def map_age_groups(age):
+                if pd.isna(age):
+                    return 0
+                if age <= 19:
+                    return 0
+                elif 20 <= age <= 22:
+                    return 1
+                elif 23 <= age <= 25:
+                    return 2
+                else:
+                    return 3
+            
+            data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
+            data.drop(columns=['Edad'], inplace=True)
+        
+        # 2.11 Internacional (si existe)
+        if 'País Nacimiento' not in data.columns:  # Si ya se procesó
+            if 'Internacional' in data.columns:
+                print("       → Encoding: Internacional")
+                data['Internacional'] = data['Internacional'].astype(int)
+        
+        # PASO 3: Eliminar columnas que definitivamente no son features
+        cols_eliminar = [
+            # Identificación
+            'ID', 'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última',
+            '2º Apellido', '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
+            
+            # Documentos
+            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm',
+            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad',
+            
+            # Contacto
+            'Dirección', 'Dirección 1', 'Dirección 2',
+            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
+            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
+            'Celular Inscripción',
+            
+            # Fechas
+            'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm', 'Fecha Grado',
+            
+            # Ubicación (ya encoded o eliminadas)
+            'Estado (Dirección)', 'País (Dirección)', 'Ciudad Nacimiento', 'Lugar Nacimiento',
+            
+            # Colegio (texto)
+            'Colegio', 'Colegio_ppn', 'Colegio_adm', 'ID Colegio',
+            
+            # Descripciones
+            'Descripción', 'Org Acad', 'Tipo',
+            
+            # Duplicados de Prog Acad
+            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
+            
+            # Otros
+            'Situacion Acad', 'Año', 'Año_per', 'Año_prom',
+            'Estado_adm', 'Estado Clase', 'Estado',
+            'Créd Inscritos xa PromedioCicl', 'Créd.Inscrtos Aprbdos PromCicl',
+            'Num_Materias_Ciclo',
+            
+            # Ciclo Admisión duplicados (mantener solo uno)
+            'Ciclo Admisión_per', 'Ciclo Admisión_prom'
+        ]
+        
+        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
+        if cols_encontradas:
+            print(f"       → Eliminando {len(cols_encontradas)} columnas innecesarias")
+            data.drop(columns=cols_encontradas, inplace=True)
+        
+        # PASO 4: Eliminar columnas con sufijos duplicados restantes
+        cols_sufijos = [col for col in data.columns 
+                       if any(col.endswith(s) for s in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
+        if cols_sufijos:
+            print(f"       → Eliminando {len(cols_sufijos)} columnas con sufijos")
+            data.drop(columns=cols_sufijos, inplace=True)
+        
+        # PASO 5: Convertir fechas restantes a numérico
+        for col in data.select_dtypes(include=['datetime64']).columns:
+            try:
+                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
+                data[col].fillna(0, inplace=True)
+            except:
+                data.drop(columns=[col], inplace=True)
+        
+        # PASO 6: Convertir columnas object restantes a numérico o eliminar
+        for col in data.select_dtypes(include=['object']).columns:
+            try:
+                data[col] = pd.to_numeric(data[col], errors='coerce')
+                data[col].fillna(0, inplace=True)
+            except:
+                print(f"       ⚠️  Eliminando columna no convertible: {col}")
+                data.drop(columns=[col], inplace=True)
+        
+        print(f"       ✓ Columnas después: {len(data.columns)}")
+        print(f"       ✓ Tipos: {data.dtypes.value_counts().to_dict()}")
+        
+        return data
         """Limpia columnas duplicadas y renombra, eliminando columnas no numéricas"""
         
         print("    🧹 Iniciando limpieza final...")
