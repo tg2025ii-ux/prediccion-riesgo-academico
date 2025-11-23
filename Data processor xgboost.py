@@ -24,67 +24,85 @@ class DataProcessorXGBoost:
         Inicializa el procesador y carga el modelo XGBoost
         
         Args:
-            model_dir: Directorio donde están los archivos del modelo
+            model_dir: Directorio donde están los archivos del modelo (por defecto: raíz '.')
         """
         self.model_dir = model_dir
         self._cargar_modelo()
     
-def _cargar_modelo(self):
-    """Carga el modelo XGBoost (solo modelo, sin scaler ni columnas)"""
-    try:
-        # Buscar en la raíz (mismo nivel que app.py)
-        modelo_path = 'xgboost_modelo.pkl'
-        
-        if not os.path.exists(modelo_path):
-            raise FileNotFoundError(
-                f"❌ Modelo no encontrado: {modelo_path}\n"
-                f"Sube 'xgboost_modelo.pkl' a la raíz del proyecto (mismo nivel que app.py)"
-            )
-        
-        # Cargar solo el modelo
-        self.modelo = joblib.load(modelo_path)
-        print("✅ Modelo XGBoost cargado exitosamente")
-        
-        # scaler y columnas son opcionales
-        self.scaler = None
-        self.columnas_modelo = None
-        
-        # Si existen, cargarlos
-        if os.path.exists('scaler.pkl'):
-            self.scaler = joblib.load('scaler.pkl')
-            print("✅ Scaler cargado")
-        else:
-            print("⚠️ scaler.pkl no encontrado - continuando sin estandarización")
-        
-        if os.path.exists('columnas.pkl'):
-            self.columnas_modelo = joblib.load('columnas.pkl')
-            print("✅ Columnas cargadas")
-        else:
-            print("⚠️ columnas.pkl no encontrado - usando todas las columnas")
-        
-    except Exception as e:
-        print(f"❌ Error cargando modelo: {str(e)}")
-        self.modelo = None
-        self.scaler = None
-        self.columnas_modelo = None
+    def _cargar_modelo(self):
+        """Carga el modelo XGBoost y archivos auxiliares"""
+        try:
+            modelo_path = 'xgboost_modelo.pkl'
+            scaler_path = 'scaler.pkl'
+            columnas_path = 'columnas.pkl'
+            
+            # Intentar descargar si no existe
+            if not os.path.exists(modelo_path):
+                print("🔍 Modelo no encontrado localmente, intentando descargar...")
+                self._descargar_modelo()
+            
+            if not os.path.exists(modelo_path):
+                raise FileNotFoundError(
+                    f"❌ Modelo no encontrado: {modelo_path}\n"
+                    f"   Verifica que el archivo se descargó correctamente de Google Drive\n"
+                    f"   O sube 'xgboost_modelo.pkl' manualmente a la raíz del proyecto"
+                )
+            
+            # Cargar modelo
+            self.modelo = joblib.load(modelo_path)
+            print("✅ Modelo XGBoost cargado exitosamente")
+            
+            # Cargar scaler (opcional)
+            if os.path.exists(scaler_path):
+                self.scaler = joblib.load(scaler_path)
+                print("✅ Scaler cargado")
+            else:
+                self.scaler = None
+                print("⚠️  scaler.pkl no encontrado - continuando sin estandarización previa")
+            
+            # Cargar columnas (opcional)
+            if os.path.exists(columnas_path):
+                self.columnas_modelo = joblib.load(columnas_path)
+                print("✅ Columnas del modelo cargadas")
+            else:
+                self.columnas_modelo = None
+                print("⚠️  columnas.pkl no encontrado - usando todas las columnas disponibles")
+            
+        except Exception as e:
+            print(f"❌ Error cargando modelo: {str(e)}")
+            self.modelo = None
+            self.scaler = None
+            self.columnas_modelo = None
     
     def _descargar_modelo(self):
         """
         Descarga el modelo desde Google Drive si no existe localmente
         """
-        import urllib.request
-        import gdown
+        try:
+            import gdown
+        except ImportError:
+            print("❌ Error: gdown no está instalado")
+            print("   Ejecuta: pip install gdown")
+            return
         
-        # URL de Google Drive (debe ser link directo de descarga)
-        # TODO: Reemplazar con tu URL real
-        url = "https://drive.google.com/uc?id=TU_FILE_ID_AQUI"
+        modelo_path = 'xgboost_modelo.pkl'
         
-        os.makedirs(self.model_dir, exist_ok=True)
-        output_path = os.path.join(self.model_dir, 'xgboost_modelo.pkl')
-        
-        print("⬇️ Descargando modelo desde Google Drive...")
-        gdown.download(url, output_path, quiet=False)
-        print("✅ Modelo descargado")
+        if not os.path.exists(modelo_path):
+            print("⬇️ Descargando modelo desde Google Drive...")
+            print("   Tamaño: ~142 MB - Esto puede tomar 1-2 minutos")
+            
+            # ID del archivo en Google Drive
+            file_id = "1VLySTpc2m4soxTEjTi7xUSJcXyrF00JF"
+            url = f"https://drive.google.com/uc?id={file_id}"
+            
+            try:
+                gdown.download(url, modelo_path, quiet=False)
+                print("✅ Modelo descargado exitosamente")
+            except Exception as e:
+                print(f"❌ Error descargando: {str(e)}")
+                print("   Verifica que el enlace de Google Drive sea público")
+        else:
+            print("✅ Modelo ya existe localmente")
     
     def procesar_archivo_excel(self, archivo_path: str) -> pd.DataFrame:
         """
