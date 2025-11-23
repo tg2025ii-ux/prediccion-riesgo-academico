@@ -1,22 +1,23 @@
 """
-Data Processor - PARTE 1: LIMPIEZA Y PREPARACIÓN
-Replica exactamente los pasos 1-13 del pipeline_streamlit.py
+Data Processor COMPLETO - Limpieza hasta antes de dumificación
+Replica EXACTAMENTE el pipeline_streamlit.py hasta el punto de encoding
+Incluye TODOS los pasos de limpieza, transformación, y cálculo de variables
 """
 
 import pandas as pd
 import numpy as np
 import re
+from datetime import datetime
 from typing import Tuple
 
-class DataProcessorLimpieza:
+class DataProcessorLimpiezaCompleto:
     """
-    Procesador que replica los pasos 1-13 del pipeline streamlit
-    Genera base de datos limpia y preparada para encoding
+    Procesador que replica TODOS los pasos del pipeline hasta antes de dumificación
     """
     
     def __init__(self):
         """Inicializa el procesador"""
-        print("✅ Procesador de Limpieza inicializado")
+        print("✅ Procesador de Limpieza COMPLETO inicializado")
     
     def procesar_desde_excel(self, archivo_path: str) -> pd.DataFrame:
         """
@@ -47,209 +48,183 @@ class DataProcessorLimpieza:
     def procesar_dataframes(self, notas: pd.DataFrame, per: pd.DataFrame, 
                            prom: pd.DataFrame, adm: pd.DataFrame) -> pd.DataFrame:
         """
-        Procesa los 4 DataFrames y retorna base limpia
+        Procesa los 4 DataFrames con TODOS los pasos de limpieza
         
         Args:
             notas, per, prom, adm: DataFrames de las 4 bases
             
         Returns:
-            DataFrame limpio
+            DataFrame limpio (sin dumificación)
         """
         print("\n" + "="*80)
-        print("🔄 INICIANDO PROCESAMIENTO COMPLETO")
+        print("🔄 INICIANDO PROCESAMIENTO COMPLETO - TODOS LOS PASOS")
         print("="*80)
         
-        # PASO 0: Consolidación inicial (crear estructura base con Dropout)
-        notas_consolidada = self._paso_0_consolidacion_inicial(notas)
+        # ========== FASE 0: PREPARACIÓN DE NOTAS ==========
+        print("\n" + "="*80)
+        print("FASE 0: PREPARACIÓN DE NOTAS")
+        print("="*80)
         
-        # PASO 1-4: Renombres
-        notas_consolidada, per, prom, adm = self._paso_1_4_renombres(notas_consolidada, per, prom, adm)
+        # Paso -1: Limpieza inicial de NOTAS
+        notas = self._paso_limpieza_inicial_notas(notas)
         
-        # PASO 5: Eliminar IDs fallecidos
-        notas_consolidada, per, prom, adm = self._paso_5_eliminar_fallecidos(notas_consolidada, per, prom, adm)
+        # Paso 0A: Consolidación (crear estructura con Dropout)
+        notas_consolidada = self._paso_consolidacion_inicial(notas)
         
-        # PASO 6: Filtrar ciclos y créditos
-        notas_consolidada, per, prom, adm = self._paso_6_filtrar_ciclos(notas_consolidada, per, prom, adm)
+        # Paso 0B: Métricas de calificaciones
+        notas_consolidada = self._paso_metricas_calificaciones(notas, notas_consolidada)
         
-        # PASO 7: Transformar Mult Programa
-        notas_consolidada, per, prom = self._paso_7_transformar_mult_programa(notas_consolidada, per, prom)
+        # Paso 0C: Métricas adicionales
+        notas_consolidada = self._paso_metricas_adicionales(notas, notas_consolidada)
         
-        # PASO 8: Merge PER + PROM + NOTAS
-        per_prom_notas = self._paso_8_merge_per_prom_notas(per, prom, notas_consolidada)
+        # ========== FASE 1: FILTROS INICIALES ==========
+        print("\n" + "="*80)
+        print("FASE 1: FILTROS INICIALES")
+        print("="*80)
         
-        # PASO 9: Merge con ADM
-        data_fusionada = self._paso_9_merge_adm(per_prom_notas, adm)
+        # Eliminar ciclos máximos
+        notas_consolidada, per, prom, adm = self._eliminar_ciclos_maximos(notas_consolidada, per, prom, adm)
         
-        # PASO 10: Resolver duplicados y eliminar Acción/Motivo
-        data_limpia = self._paso_10_resolver_duplicados(data_fusionada)
+        # Eliminar UCollege
+        notas_consolidada, per, prom, adm = self._eliminar_ucollege(notas_consolidada, per, prom, adm)
         
-        # PASO 11: Calcular Siglas Prog (moda)
-        data_con_siglas = self._paso_11_calcular_siglas_prog(data_limpia)
+        # Filtrar ADM activos
+        adm = self._filtrar_adm_activos(adm)
         
-        # PASO 12: Quitar penúltimo y crear Siglas Prog
-        data_final = self._paso_12_crear_siglas_prog(data_con_siglas)
+        # IDs comunes
+        notas_consolidada, per, prom, adm = self._filtrar_ids_comunes(notas_consolidada, per, prom, adm)
         
-        # PASO 13: Rellenar Dpto y País Nacimiento
-        data_final = self._paso_13_rellenar_dpto_pais(data_final)
+        # ========== FASE 2: RELLENAR CICLO ADMISIÓN ==========
+        print("\n" + "="*80)
+        print("FASE 2: RELLENAR CICLO ADMISIÓN")
+        print("="*80)
+        
+        per, prom = self._rellenar_ciclo_admision(per, prom, adm)
+        
+        # Convertir Ciclo a numérico
+        notas_consolidada, per, prom, adm = self._convertir_ciclo_numerico(notas_consolidada, per, prom, adm)
+        
+        # ========== FASE 3: ELIMINAR COLUMNAS Y RENOMBRAR ==========
+        print("\n" + "="*80)
+        print("FASE 3: ELIMINAR COLUMNAS Y RENOMBRAR")
+        print("="*80)
+        
+        adm, per, prom = self._eliminar_columnas_innecesarias(adm, per, prom)
+        adm, per, prom, notas_consolidada = self._renombrar_columnas(adm, per, prom, notas_consolidada)
+        
+        # ========== FASE 4: FILTROS DE CALIDAD ==========
+        print("\n" + "="*80)
+        print("FASE 4: FILTROS DE CALIDAD")
+        print("="*80)
+        
+        # Eliminar fallecidos
+        notas_consolidada, per, prom, adm = self._eliminar_fallecidos(notas_consolidada, per, prom, adm)
+        
+        # Filtrar ciclos 10/30
+        notas_consolidada, per, prom, adm = self._filtrar_ciclos_10_30(notas_consolidada, per, prom, adm)
+        
+        # Filtrar créditos = 0
+        per, prom = self._filtrar_creditos_cero(per, prom)
+        
+        # Transformar Mult Programa
+        notas_consolidada, per, prom = self._transformar_mult_programa(notas_consolidada, per, prom)
+        
+        # ========== FASE 5: MERGE DE BASES ==========
+        print("\n" + "="*80)
+        print("FASE 5: MERGE DE BASES")
+        print("="*80)
+        
+        data_fusionada = self._merge_todas_bases(per, prom, notas_consolidada, adm)
+        
+        # ========== FASE 6: RESOLVER DUPLICADOS ==========
+        print("\n" + "="*80)
+        print("FASE 6: RESOLVER DUPLICADOS")
+        print("="*80)
+        
+        data_limpia = self._resolver_duplicados(data_fusionada)
+        
+        # ========== FASE 7: CALCULAR SIGLAS PROG ==========
+        print("\n" + "="*80)
+        print("FASE 7: CALCULAR SIGLAS PROG")
+        print("="*80)
+        
+        data_con_siglas = self._calcular_siglas_prog(data_limpia)
+        
+        # ========== FASE 8: LIMPIEZA GEOGRÁFICA ==========
+        print("\n" + "="*80)
+        print("FASE 8: LIMPIEZA GEOGRÁFICA")
+        print("="*80)
+        
+        data_geo = self._limpieza_geografica(data_con_siglas)
+        
+        # ========== FASE 9: RELLENAR DATOS FALTANTES ==========
+        print("\n" + "="*80)
+        print("FASE 9: RELLENAR DATOS FALTANTES")
+        print("="*80)
+        
+        data_completa = self._rellenar_datos_faltantes(data_geo)
+        
+        # ========== FASE 10: CALCULAR EDAD ==========
+        print("\n" + "="*80)
+        print("FASE 10: CALCULAR EDAD")
+        print("="*80)
+        
+        data_final = self._calcular_edad(data_completa)
         
         print("\n" + "="*80)
         print(f"✅ PROCESAMIENTO COMPLETADO")
         print(f"   • Registros finales: {len(data_final)}")
         print(f"   • Columnas finales: {len(data_final.columns)}")
+        print(f"   • Listo para encoding")
         print("="*80)
         
         return data_final
     
-    def procesar_dataframes(self, notas: pd.DataFrame, per: pd.DataFrame, 
-                           prom: pd.DataFrame, adm: pd.DataFrame) -> pd.DataFrame:
-        """
-        Procesa los 4 DataFrames y retorna base limpia
-        
-        Args:
-            notas, per, prom, adm: DataFrames de las 4 bases
-            
-        Returns:
-            DataFrame limpio
-        """
-        print("\n" + "="*80)
-        print("🔄 INICIANDO PROCESAMIENTO COMPLETO")
-        print("="*80)
-        
-        # PASO -1: Limpieza inicial específica de NOTAS
-        notas = self._paso_menos1_limpieza_inicial_notas(notas)
-        
-        # PASO 0A: Consolidación inicial (crear estructura base con Dropout)
-        notas_consolidada = self._paso_0a_consolidacion_inicial(notas)
-        
-        # PASO 0B: Calcular métricas de calificaciones
-        notas_consolidada = self._paso_0b_metricas_calificaciones(notas, notas_consolidada)
-        
-        # PASO 0C: Agregar métricas adicionales
-        notas_consolidada = self._paso_0c_metricas_adicionales(notas, notas_consolidada)
-        
-        # PASO 1-4: Renombres
-        notas_consolidada, per, prom, adm = self._paso_1_4_renombres(notas_consolidada, per, prom, adm)
-        
-        # PASO 5: Eliminar IDs fallecidos
-        notas_consolidada, per, prom, adm = self._paso_5_eliminar_fallecidos(notas_consolidada, per, prom, adm)
-        
-        # PASO 6: Filtrar ciclos y créditos
-        notas_consolidada, per, prom, adm = self._paso_6_filtrar_ciclos(notas_consolidada, per, prom, adm)
-        
-        # PASO 7: Transformar Mult Programa
-        notas_consolidada, per, prom = self._paso_7_transformar_mult_programa(notas_consolidada, per, prom)
-        
-        # PASO 8: Merge PER + PROM + NOTAS
-        per_prom_notas = self._paso_8_merge_per_prom_notas(per, prom, notas_consolidada)
-        
-        # PASO 9: Merge con ADM
-        data_fusionada = self._paso_9_merge_adm(per_prom_notas, adm)
-        
-        # PASO 10: Resolver duplicados y eliminar Acción/Motivo
-        data_limpia = self._paso_10_resolver_duplicados(data_fusionada)
-        
-        # PASO 11: Calcular Siglas Prog (moda)
-        data_con_siglas = self._paso_11_calcular_siglas_prog(data_limpia)
-        
-        # PASO 12: Quitar penúltimo y crear Siglas Prog
-        data_final = self._paso_12_crear_siglas_prog(data_con_siglas)
-        
-        # PASO 13: Rellenar Dpto y País Nacimiento
-        data_final = self._paso_13_rellenar_dpto_pais(data_final)
-        
-        print("\n" + "="*80)
-        print(f"✅ PROCESAMIENTO COMPLETADO")
-        print(f"   • Registros finales: {len(data_final)}")
-        print(f"   • Columnas finales: {len(data_final.columns)}")
-        print("="*80)
-        
-        return data_final
+    # ============================================================================
+    # FASE 0: PREPARACIÓN DE NOTAS
+    # ============================================================================
     
-    def _paso_menos1_limpieza_inicial_notas(self, notas):
-        """
-        PASO -1: Limpieza inicial específica de NOTAS
-        Antes de consolidar, se hacen estos cambios
-        """
-        print("\n🧹 PASO -1: Limpieza inicial de NOTAS")
-        print("="*80)
+    def _paso_limpieza_inicial_notas(self, notas):
+        """Limpieza inicial específica de NOTAS"""
+        print("\n🧹 Limpieza inicial de NOTAS")
         
-        # Renombrar Estado.1 a Estado Clase
+        # Renombrar Estado.1
         if 'Estado.1' in notas.columns:
             notas = notas.rename(columns={'Estado.1': 'Estado Clase'})
-            print("   ✓ 'Estado.1' renombrado a 'Estado Clase'")
+            print("   ✓ 'Estado.1' → 'Estado Clase'")
         
-        # Eliminar columnas innecesarias
+        # Eliminar columnas
         cols_drop = ['Nombre', 'Nº Oferta', 'Nº Clase', 'Sesión', 'Sección', 'Motivo']
-        cols_drop_found = [c for c in cols_drop if c in notas.columns]
-        
-        if cols_drop_found:
-            notas = notas.drop(columns=cols_drop_found)
-            print(f"   ✓ Eliminadas {len(cols_drop_found)} columnas: {cols_drop_found}")
-        
-        print(f"   ✓ NOTAS después de limpieza: {len(notas)} registros, {len(notas.columns)} columnas")
+        cols_found = [c for c in cols_drop if c in notas.columns]
+        if cols_found:
+            notas = notas.drop(columns=cols_found)
+            print(f"   ✓ Eliminadas: {cols_found}")
         
         return notas
     
-    def _paso_0a_consolidacion_inicial(self, notas):
-        """
-        PASO 0A: Consolidación inicial - Crear estructura base con Dropout
-        Replica crear_base_consolidada_paso1_simple del pipeline original
-        """
-        print("\n🏗️ PASO 0A: CONSOLIDACIÓN INICIAL (estructura base + Dropout)")
-        print("="*80)
+    def _paso_consolidacion_inicial(self, notas):
+        """PASO 1: Consolidación (estructura base + Dropout)"""
+        print("\n🏗️ PASO 1: Consolidación (estructura base + Dropout)")
         
-        # Estados que indican deserción
         estados_desercion = ["Suspendido", "Permiso", "Interrumpido", "Expulsado", "Cancelado"]
         
-        print("📊 Información de NOTAS:")
-        print(f"   • Total registros: {len(notas):,}")
-        
-        # Determinar nombres de columnas
+        # Identificar columnas
         col_id = 'ID'
         col_ciclo = 'Ciclo'
+        col_grado = next((c for c in ['Grado Académico', 'Grado_Academico'] if c in notas.columns), None)
+        col_programa = next((c for c in ['Programa Académico Base', 'Programa_Academico_Base'] if c in notas.columns), None)
+        col_estado = next((c for c in ['Estado', 'Estado Clase'] if c in notas.columns), None)
         
-        # Buscar columna de Grado
-        col_grado = None
-        for possible in ['Grado Académico', 'Grado_Academico', 'Grado']:
-            if possible in notas.columns:
-                col_grado = possible
-                break
-        
-        # Buscar columna de Programa
-        col_programa = None
-        for possible in ['Programa Académico Base', 'Programa_Academico_Base', 'Programa']:
-            if possible in notas.columns:
-                col_programa = possible
-                break
-        
-        # Buscar columna de Estado (puede ser 'Estado' o 'Estado Clase')
-        col_estado = None
-        for possible in ['Estado', 'Estado Clase', 'Estado.1']:
-            if possible in notas.columns:
-                col_estado = possible
-                break
-        
-        if not all([col_grado, col_programa, col_estado]):
-            raise ValueError(f"❌ No se encontraron columnas necesarias. Disponibles: {list(notas.columns)}")
-        
-        print(f"   ✓ Columnas identificadas:")
-        print(f"      - Grado: {col_grado}")
-        print(f"      - Programa: {col_programa}")
-        print(f"      - Estado: {col_estado}")
-        
-        # Obtener combinaciones únicas
+        # Crear agrupación
         columnas_agrupacion = [col_id, col_grado, col_ciclo]
         df_unico = notas[columnas_agrupacion + [col_programa, col_estado]].drop_duplicates()
         
-        print(f"\n⚡ Creando agrupación base...")
-        
-        # Agrupar y obtener valores más frecuentes (moda)
         agrupacion_base = df_unico.groupby(columnas_agrupacion).agg({
             col_programa: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0],
             col_estado: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]
         }).reset_index()
         
-        # Renombrar columnas estandarizadas
+        # Renombrar
         rename_dict = {
             col_id: 'ID',
             col_grado: 'Grado_Academico',
@@ -259,51 +234,30 @@ class DataProcessorLimpieza:
         }
         agrupacion_base = agrupacion_base.rename(columns=rename_dict)
         
-        # Calcular variable Dropout
-        print(f"   🎯 Calculando variable Dropout...")
+        # Dropout
         agrupacion_base['Dropout'] = agrupacion_base['Estado'].apply(
-            lambda estado: 1 if estado in estados_desercion else 0
+            lambda x: 1 if x in estados_desercion else 0
         )
         
-        # Estadísticas
-        dropout_count = agrupacion_base['Dropout'].value_counts()
-        print(f"\n   ✓ Consolidación completada:")
-        print(f"      • Registros consolidados: {len(agrupacion_base):,}")
-        print(f"      • Sin deserción (0): {dropout_count.get(0, 0):,}")
-        print(f"      • En deserción (1): {dropout_count.get(1, 0):,}")
+        print(f"   ✓ Consolidados: {len(agrupacion_base)} registros")
+        print(f"   ✓ Dropout=0: {(agrupacion_base['Dropout']==0).sum()}")
+        print(f"   ✓ Dropout=1: {(agrupacion_base['Dropout']==1).sum()}")
         
         return agrupacion_base
     
-    def _paso_0b_metricas_calificaciones(self, notas_original, notas_consolidada):
-        """
-        PASO 0B: Calcular métricas de calificaciones
-        Replica calcular_metricas_calificaciones_paso2_optimizado
-        """
-        print("\n📊 PASO 0B: CALCULANDO MÉTRICAS DE CALIFICACIONES")
-        print("="*80)
+    def _paso_metricas_calificaciones(self, notas_original, notas_consolidada):
+        """PASO 2: Calcular métricas de calificaciones"""
+        print("\n📊 PASO 2: Métricas de calificaciones")
         
-        # Identificar columnas
         col_id = 'ID'
         col_ciclo = 'Ciclo'
         col_calif = 'Calif'
         col_creditos = 'Uni Matrd'
-        
-        # Buscar columna de Grado
-        col_grado = None
-        for possible in ['Grado Académico', 'Grado_Academico']:
-            if possible in notas_original.columns:
-                col_grado = possible
-                break
-        
-        # Buscar columnas de ID Curso y Descripción
+        col_grado = next((c for c in ['Grado Académico', 'Grado_Academico'] if c in notas_original.columns), None)
         col_id_curso = 'ID Curso' if 'ID Curso' in notas_original.columns else None
         col_descripcion = 'Descripción' if 'Descripción' in notas_original.columns else None
         
-        if not all([col_grado, col_calif, col_creditos]):
-            print("   ⚠️ No se encontraron columnas necesarias para métricas")
-            return notas_consolidada
-        
-        # Filtrar datos válidos
+        # Filtrar válidos
         mask_validos = (
             notas_original[col_calif].notna() &
             notas_original[col_creditos].notna() &
@@ -311,11 +265,8 @@ class DataProcessorLimpieza:
         )
         df_validos = notas_original[mask_validos].copy()
         
-        print(f"   • Registros válidos para cálculo: {len(df_validos):,}")
-        
-        # Agrupar y calcular métricas
+        # Calcular métricas
         grupos = df_validos.groupby([col_id, col_grado, col_ciclo])
-        
         metricas_lista = []
         
         for (id_est, grado, ciclo), grupo in grupos:
@@ -325,33 +276,13 @@ class DataProcessorLimpieza:
             if len(califs) == 0:
                 continue
             
-            # Promedio ponderado
             promedio = np.average(califs, weights=creditos)
+            desviacion = np.sqrt(np.average((califs - promedio)**2, weights=creditos)) if len(califs) > 1 else 0.0
             
-            # Desviación estándar ponderada
-            if len(califs) > 1:
-                varianza = np.average((califs - promedio)**2, weights=creditos)
-                desviacion = np.sqrt(varianza)
-            else:
-                desviacion = 0.0
-            
-            # MIN y sus detalles
             idx_min = grupo[col_calif].idxmin()
-            min_calif = grupo.loc[idx_min, col_calif]
-            min_creditos = grupo.loc[idx_min, col_creditos]
-            min_id_curso = grupo.loc[idx_min, col_id_curso] if col_id_curso else ''
-            min_descripcion = grupo.loc[idx_min, col_descripcion] if col_descripcion else 'Sin datos'
-            
-            # MAX y sus detalles
             idx_max = grupo[col_calif].idxmax()
-            max_calif = grupo.loc[idx_max, col_calif]
-            max_creditos = grupo.loc[idx_max, col_creditos]
-            max_id_curso = grupo.loc[idx_max, col_id_curso] if col_id_curso else ''
-            max_descripcion = grupo.loc[idx_max, col_descripcion] if col_descripcion else 'Sin datos'
             
-            # Rango ponderado
             contribuciones = califs * creditos
-            rango_ponderado = contribuciones.max() - contribuciones.min()
             
             metricas_lista.append({
                 'ID': id_est,
@@ -359,27 +290,19 @@ class DataProcessorLimpieza:
                 'Ciclo': ciclo,
                 'Promedio_Ciclo': round(promedio, 2),
                 'Des_Estandar_Ciclo': round(desviacion, 2),
-                'Min_Ciclo': round(min_calif, 2),
-                'Cred_Min_Calif_Ciclo': min_creditos,
-                'ID_Min_Ciclo': min_id_curso,
-                'Clase_Min_Ciclo': str(min_descripcion),
-                'Max_Ciclo': round(max_calif, 2),
-                'Cred_Max_Calif_Ciclo': max_creditos,
-                'ID_Max_Ciclo': max_id_curso,
-                'Clase_Max_Ciclo': str(max_descripcion),
-                'Rango_Ponderado_Ciclo': round(rango_ponderado, 2)
+                'Min_Ciclo': round(grupo.loc[idx_min, col_calif], 2),
+                'Cred_Min_Calif_Ciclo': grupo.loc[idx_min, col_creditos],
+                'ID_Min_Ciclo': grupo.loc[idx_min, col_id_curso] if col_id_curso else '',
+                'Clase_Min_Ciclo': str(grupo.loc[idx_min, col_descripcion]) if col_descripcion else 'Sin datos',
+                'Max_Ciclo': round(grupo.loc[idx_max, col_calif], 2),
+                'Cred_Max_Calif_Ciclo': grupo.loc[idx_max, col_creditos],
+                'ID_Max_Ciclo': grupo.loc[idx_max, col_id_curso] if col_id_curso else '',
+                'Clase_Max_Ciclo': str(grupo.loc[idx_max, col_descripcion]) if col_descripcion else 'Sin datos',
+                'Rango_Ponderado_Ciclo': round(contribuciones.max() - contribuciones.min(), 2)
             })
         
         metricas_df = pd.DataFrame(metricas_lista)
-        
-        # Merge con notas_consolidada
-        notas_con_metricas = notas_consolidada.merge(
-            metricas_df,
-            on=['ID', 'Grado_Academico', 'Ciclo'],
-            how='left'
-        )
-        
-        # Rellenar NaN
+        notas_con_metricas = notas_consolidada.merge(metricas_df, on=['ID', 'Grado_Academico', 'Ciclo'], how='left')
         notas_con_metricas['Clase_Min_Ciclo'] = notas_con_metricas['Clase_Min_Ciclo'].fillna('Sin datos')
         notas_con_metricas['Clase_Max_Ciclo'] = notas_con_metricas['Clase_Max_Ciclo'].fillna('Sin datos')
         
@@ -387,155 +310,171 @@ class DataProcessorLimpieza:
         
         return notas_con_metricas
     
-    def _paso_0c_metricas_adicionales(self, notas_original, notas_consolidada):
-        """
-        PASO 0C: Agregar métricas adicionales
-        - Num_Materias_Ciclo
-        - Cant_Perdidas
-        - Materias_Vistas
-        """
-        print("\n📊 PASO 0C: CALCULANDO MÉTRICAS ADICIONALES")
-        print("="*80)
+    def _paso_metricas_adicionales(self, notas_original, notas_consolidada):
+        """PASO 3: Métricas adicionales (Num_Materias, Cant_Perdidas, Materias_Vistas)"""
+        print("\n📊 PASO 3: Métricas adicionales")
         
-        # Identificar columnas
         col_id = 'ID'
         col_ciclo = 'Ciclo'
         col_calif = 'Calif'
-        col_estado = None
+        col_programa = next((c for c in ['Programa Académico Base', 'Programa_Academico_Base'] if c in notas_original.columns), None)
+        col_estado = next((c for c in ['Estado', 'Estado Clase'] if c in notas_original.columns), None)
         
-        # Buscar columna de Programa
-        col_programa = None
-        for possible in ['Programa Académico Base', 'Programa_Academico_Base']:
-            if possible in notas_original.columns:
-                col_programa = possible
-                break
-        
-        # Buscar columna de Estado
-        for possible in ['Estado', 'Estado Clase']:
-            if possible in notas_original.columns:
-                col_estado = possible
-                break
-        
-        if not all([col_programa, col_calif, col_estado]):
-            print("   ⚠️ No se encontraron columnas necesarias para métricas adicionales")
-            return notas_consolidada
-        
-        # Calcular métricas agrupadas
         grouped = notas_original.groupby([col_id, col_programa, col_ciclo]).agg(
             Num_Materias_Ciclo=(col_id, 'count'),
             Cant_Perdidas=(col_calif, lambda x: (x < 3).sum()),
             Materias_Vistas=(col_estado, lambda x: (x == 'E').sum())
         ).reset_index()
         
-        # Renombrar para merge
-        rename_dict = {col_programa: 'Programa_Academico_Base'}
-        grouped = grouped.rename(columns=rename_dict)
+        grouped = grouped.rename(columns={col_programa: 'Programa_Academico_Base'})
+        notas_final = notas_consolidada.merge(grouped, on=['ID', 'Programa_Academico_Base', 'Ciclo'], how='left')
         
-        # Merge con notas_consolidada
-        notas_final = notas_consolidada.merge(
-            grouped,
-            on=['ID', 'Programa_Academico_Base', 'Ciclo'],
-            how='left'
-        )
-        
-        print(f"   ✓ Métricas adicionales agregadas")
-        print(f"      • Num_Materias_Ciclo")
-        print(f"      • Cant_Perdidas")
-        print(f"      • Materias_Vistas")
+        print("   ✓ Agregadas: Num_Materias_Ciclo, Cant_Perdidas, Materias_Vistas")
         
         return notas_final
-        """
-        PASO 0: Consolidación inicial - Crear estructura base con Dropout
-        Replica crear_base_consolidada_paso1_simple del pipeline original
-        """
-        print("\n🏗️ PASO 0: CONSOLIDACIÓN INICIAL (estructura base + Dropout)")
-        print("="*80)
-        
-        # Estados que indican deserción
-        estados_desercion = ["Suspendido", "Permiso", "Interrumpido", "Expulsado", "Cancelado"]
-        
-        print("📊 Información de NOTAS original:")
-        print(f"   • Total registros: {len(notas):,}")
-        print(f"   • Columnas: {list(notas.columns)[:10]}...")
-        
-        # Determinar nombres de columnas (pueden variar)
-        col_id = 'ID'
-        col_ciclo = 'Ciclo'
-        
-        # Buscar columna de Grado
-        col_grado = None
-        for possible in ['Grado Académico', 'Grado_Academico', 'Grado']:
-            if possible in notas.columns:
-                col_grado = possible
-                break
-        
-        # Buscar columna de Programa
-        col_programa = None
-        for possible in ['Programa Académico Base', 'Programa_Academico_Base', 'Programa']:
-            if possible in notas.columns:
-                col_programa = possible
-                break
-        
-        # Buscar columna de Estado
-        col_estado = None
-        for possible in ['Estado', 'Estado.1', 'Estado Clase']:
-            if possible in notas.columns:
-                col_estado = possible
-                break
-        
-        if not all([col_grado, col_programa, col_estado]):
-            raise ValueError(f"❌ No se encontraron columnas necesarias. Disponibles: {list(notas.columns)}")
-        
-        print(f"   ✓ Usando columnas:")
-        print(f"      - ID: {col_id}")
-        print(f"      - Grado: {col_grado}")
-        print(f"      - Programa: {col_programa}")
-        print(f"      - Ciclo: {col_ciclo}")
-        print(f"      - Estado: {col_estado}")
-        
-        # Obtener combinaciones únicas
-        columnas_agrupacion = [col_id, col_grado, col_ciclo]
-        
-        df_unico = notas[columnas_agrupacion + [col_programa, col_estado]].drop_duplicates()
-        
-        print(f"\n⚡ Creando agrupación base...")
-        
-        # Agrupar y obtener valores más frecuentes
-        agrupacion_base = df_unico.groupby(columnas_agrupacion).agg({
-            col_programa: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0],
-            col_estado: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]
-        }).reset_index()
-        
-        # Renombrar columnas estandarizadas
-        rename_dict = {
-            col_id: 'ID',
-            col_grado: 'Grado_Academico',
-            col_ciclo: 'Ciclo',
-            col_programa: 'Programa_Academico_Base',
-            col_estado: 'Estado'
-        }
-        agrupacion_base = agrupacion_base.rename(columns=rename_dict)
-        
-        # Calcular variable Dropout
-        print(f"   🎯 Calculando variable Dropout...")
-        agrupacion_base['Dropout'] = agrupacion_base['Estado'].apply(
-            lambda estado: 1 if estado in estados_desercion else 0
-        )
-        
-        # Estadísticas
-        dropout_count = agrupacion_base['Dropout'].value_counts()
-        print(f"\n   ✓ Consolidación completada:")
-        print(f"      • Registros consolidados: {len(agrupacion_base):,}")
-        print(f"      • Sin deserción (0): {dropout_count.get(0, 0):,}")
-        print(f"      • En deserción (1): {dropout_count.get(1, 0):,}")
-        
-        return agrupacion_base
     
-    def _paso_1_4_renombres(self, notas_consolidada, per, prom, adm):
-        """PASO 1-4: Renombrar columnas en las 4 bases"""
-        print("\n📝 PASO 1-4: Renombrando columnas...")
+    # ============================================================================
+    # FASE 1: FILTROS INICIALES
+    # ============================================================================
+    
+    def _eliminar_ciclos_maximos(self, notas, per, prom, adm):
+        """Eliminar ciclos máximos de cada base"""
+        print("\n🗑️ Eliminando ciclos máximos...")
         
-        # PASO 1: ADM
+        ciclo_max_per = per["Ciclo"].max()
+        ciclo_max_prom = prom["Ciclo"].max()
+        ciclo_max_adm = adm["Ciclo"].max()
+        ciclo_max_notas = notas["Ciclo"].max()
+        
+        per = per[per["Ciclo"] != ciclo_max_per].copy()
+        prom = prom[prom["Ciclo"] != ciclo_max_prom].copy()
+        adm = adm[adm["Ciclo"] != ciclo_max_adm].copy()
+        notas = notas[notas["Ciclo"] != ciclo_max_notas].copy()
+        
+        print(f"   ✓ Eliminado ciclo max: PER={ciclo_max_per}, PROM={ciclo_max_prom}, ADM={ciclo_max_adm}, NOTAS={ciclo_max_notas}")
+        
+        return notas, per, prom, adm
+    
+    def _eliminar_ucollege(self, notas, per, prom, adm):
+        """Eliminar UCollege Javeriano"""
+        print("\n🗑️ Eliminando UCollege Javeriano...")
+        
+        per = per[per["Programa"] != "UCollege Javeriano"].copy()
+        prom = prom[prom["Programa"] != "UCollege Javeriano"].copy()
+        adm = adm[adm["Programa Académico"] != "UCollege Javeriano"].copy()
+        notas = notas[notas["Programa_Academico_Base"] != "UCOLL"].copy()
+        
+        print("   ✓ UCollege eliminado de todas las bases")
+        
+        return notas, per, prom, adm
+    
+    def _filtrar_adm_activos(self, adm):
+        """Filtrar solo activos en ADM"""
+        print("\n✅ Filtrando ADM: solo 'Activo en Programa'...")
+        
+        antes = len(adm)
+        adm = adm[adm["Estado.1"] == "Activo en Programa"].copy()
+        despues = len(adm)
+        
+        print(f"   ✓ ADM: {antes} → {despues} ({antes-despues} eliminados)")
+        
+        return adm
+    
+    def _filtrar_ids_comunes(self, notas, per, prom, adm):
+        """Filtrar IDs comunes en las 4 bases"""
+        print("\n🔗 Filtrando IDs comunes...")
+        
+        ids_comunes = set(notas["ID"]) & set(per["ID"]) & set(prom["ID"]) & set(adm["ID"])
+        
+        notas = notas[notas["ID"].isin(ids_comunes)].copy()
+        per = per[per["ID"].isin(ids_comunes)].copy()
+        prom = prom[prom["ID"].isin(ids_comunes)].copy()
+        adm = adm[adm["ID"].isin(ids_comunes)].copy()
+        
+        print(f"   ✓ IDs comunes: {len(ids_comunes)}")
+        
+        return notas, per, prom, adm
+    
+    # ============================================================================
+    # FASE 2: RELLENAR CICLO ADMISIÓN
+    # ============================================================================
+    
+    def _rellenar_ciclo_admision(self, per, prom, adm):
+        """Rellenar Ciclo Admisión en PER y PROM desde ADM"""
+        print("\n📝 Rellenando Ciclo Admisión...")
+        
+        id_prog_to_ciclo = adm.set_index(["ID", "Programa Académico"])["Ciclo"].to_dict()
+        
+        def rellenar_per(row):
+            if pd.isna(row.get("Ccl Admis")) or row.get("Ccl Admis") == "":
+                return id_prog_to_ciclo.get((row["ID"], row["Programa"]), row.get("Ccl Admis"))
+            return row.get("Ccl Admis")
+        
+        def rellenar_prom(row):
+            if pd.isna(row.get("Ciclo Admisión")) or row.get("Ciclo Admisión") == "":
+                return id_prog_to_ciclo.get((row["ID"], row["Programa"]), row.get("Ciclo Admisión"))
+            return row.get("Ciclo Admisión")
+        
+        per = per.copy()
+        prom = prom.copy()
+        
+        if "Ccl Admis" in per.columns:
+            per["Ccl Admis"] = per.apply(rellenar_per, axis=1)
+            print("   ✓ PER: Ciclo Admisión rellenado")
+        
+        if "Ciclo Admisión" in prom.columns:
+            prom["Ciclo Admisión"] = prom.apply(rellenar_prom, axis=1)
+            print("   ✓ PROM: Ciclo Admisión rellenado")
+        
+        return per, prom
+    
+    def _convertir_ciclo_numerico(self, notas, per, prom, adm):
+        """Convertir Ciclo a numérico en todas las bases"""
+        print("\n🔢 Convirtiendo Ciclo a numérico...")
+        
+        for df in [notas, per, prom, adm]:
+            if "Ciclo" in df.columns:
+                df["Ciclo"] = pd.to_numeric(df["Ciclo"], errors="coerce").astype("Int64")
+        
+        print("   ✓ Ciclo convertido a Int64 en todas las bases")
+        
+        return notas, per, prom, adm
+    
+    # ============================================================================
+    # FASE 3: ELIMINAR COLUMNAS Y RENOMBRAR
+    # ============================================================================
+    
+    def _eliminar_columnas_innecesarias(self, adm, per, prom):
+        """Eliminar columnas innecesarias"""
+        print("\n🗑️ Eliminando columnas innecesarias...")
+        
+        cols_adm = ['Nombre', 'Tipo Doc ID', 'Doc ID', 'Nº Solic', 'Prefijo', 'Teléfono', 
+                    'Dirección 1', 'Dirección 2', 'Tipo', 'Correo-E', 'Otro Correo E', 
+                    'Prog Acad.1', 'Celular Inscripción']
+        cols_adm_found = [c for c in cols_adm if c in adm.columns]
+        if cols_adm_found:
+            adm = adm.drop(columns=cols_adm_found)
+            print(f"   ✓ ADM: {len(cols_adm_found)} columnas eliminadas")
+        
+        cols_prom = ['Nombres', 'Apellidos', '2º Apellido', 'Tipo Doc Identidad', 'Doc Identidad', 'Año']
+        cols_prom_found = [c for c in cols_prom if c in prom.columns]
+        if cols_prom_found:
+            prom = prom.drop(columns=cols_prom_found)
+            print(f"   ✓ PROM: {len(cols_prom_found)} columnas eliminadas")
+        
+        cols_per = ['Tipo Doc ID', 'Doc ID', 'Nombre', '2º Nombre', 'Última', '2º Apellido', 
+                    'Dirección', 'Teléfono', 'Correo-E', 'Año']
+        cols_per_found = [c for c in cols_per if c in per.columns]
+        if cols_per_found:
+            per = per.drop(columns=cols_per_found)
+            print(f"   ✓ PER: {len(cols_per_found)} columnas eliminadas")
+        
+        return adm, per, prom
+    
+    def _renombrar_columnas(self, adm, per, prom, notas):
+        """Renombrar columnas en todas las bases"""
+        print("\n📝 Renombrando columnas...")
+        
         adm = adm.rename(columns={
             'Ciclo': 'Ciclo Admisión',
             'País': 'País Nacimiento',
@@ -546,8 +485,8 @@ class DataProcessorLimpieza:
             'Descr': 'Colegio',
             'Estado.1': 'Estado'
         })
+        print("   ✓ ADM renombrado")
         
-        # PASO 2: PROM
         prom = prom.rename(columns={
             'Grado': 'Mult Programa',
             'Situacion Academica': 'Situacion Acad',
@@ -556,8 +495,8 @@ class DataProcessorLimpieza:
             'Acción Programa': 'Acción',
             'Motivo Accion': 'Motivo'
         })
+        print("   ✓ PROM renombrado")
         
-        # PASO 3: PER
         per = per.rename(columns={
             'Grado Académico': 'Mult Programa',
             'Matrd Progr': 'Créditos Inscritos en Ciclo',
@@ -567,365 +506,269 @@ class DataProcessorLimpieza:
             'Acc Prog': 'Acción',
             'Motivo Acción': 'Motivo'
         })
+        print("   ✓ PER renombrado")
         
-        # PASO 4: NOTAS CONSOLIDADA
-        # Ya viene con nombres estandarizados del PASO 0, solo necesitamos renombrar a los finales
-        print(f"   📋 Columnas en NOTAS consolidada: {list(notas_consolidada.columns)}")
-        
-        rename_dict = {
+        notas = notas.rename(columns={
             'Grado_Academico': 'Mult Programa',
-            'Programa_Academico_Base': 'Programa'
-        }
+            'Programa_Academico_Base': 'Programa',
+            'Promedio_Ciclo': 'Promedio Ciclo'
+        })
+        print("   ✓ NOTAS renombrado")
         
-        notas_consolidada = notas_consolidada.rename(columns=rename_dict)
-        
-        print(f"   ✓ NOTAS consolidada renombrada")
-        print(f"   ✓ Columnas después: {list(notas_consolidada.columns)}")
-        print("   ✓ Renombres completados")
-        
-        return notas_consolidada, per, prom, adm
+        return adm, per, prom, notas
     
-    def _paso_5_eliminar_fallecidos(self, notas, per, prom, adm):
-        """PASO 5: Eliminar IDs fallecidos"""
-        print("\n⚠️  PASO 5: Eliminando IDs fallecidos...")
+    # ============================================================================
+    # FASE 4: FILTROS DE CALIDAD
+    # ============================================================================
+    
+    def _eliminar_fallecidos(self, notas, per, prom, adm):
+        """Eliminar IDs fallecidos"""
+        print("\n⚠️ Eliminando IDs fallecidos...")
         
-        # Motivos a excluir
         motivos_excluir = ["Fallecido", "Fallecido Grado Póstumo"]
         
-        # Identificar IDs con esos motivos en PER
         if 'Motivo' in per.columns:
             ids_fallecidos = set(per.loc[per["Motivo"].isin(motivos_excluir), "ID"])
             
             if len(ids_fallecidos) > 0:
-                print(f"   → {len(ids_fallecidos)} IDs fallecidos identificados")
-                
-                # Eliminar de todas las bases
                 per = per[~per["ID"].isin(ids_fallecidos)].copy()
                 prom = prom[~prom["ID"].isin(ids_fallecidos)].copy()
                 notas = notas[~notas["ID"].isin(ids_fallecidos)].copy()
                 adm = adm[~adm["ID"].isin(ids_fallecidos)].copy()
-                
-                print(f"   ✓ IDs eliminados de todas las bases")
-            else:
-                print("   ✓ No se encontraron IDs fallecidos")
-        else:
-            print("   ⚠️  Columna 'Motivo' no encontrada en PER")
+                print(f"   ✓ {len(ids_fallecidos)} IDs fallecidos eliminados")
         
         return notas, per, prom, adm
     
-    def _paso_6_filtrar_ciclos(self, notas, per, prom, adm):
-        """PASO 6: Filtrar ciclos y créditos"""
-        print("\n🔍 PASO 6: Filtrando ciclos y créditos...")
+    def _filtrar_ciclos_10_30(self, notas, per, prom, adm):
+        """Filtrar solo ciclos que terminan en 10 o 30"""
+        print("\n🔍 Filtrando ciclos (solo 10/30)...")
         
-        def filtrar_ciclo(df, col):
-            """Función auxiliar para filtrar ciclos"""
-            if col not in df.columns:
-                return df
-            
+        def filtrar(df, col):
             antes = len(df)
             df = df.copy()
             df[col] = df[col].astype(str).str.strip()
-            df = df[df[col].str.endswith(('10', '30'))].copy()
+            df = df[df[col].str.endswith(("10", "30"))].copy()
             despues = len(df)
-            
-            print(f"   → {col}: {antes} → {despues} registros ({antes-despues} eliminados)")
-            return df
+            return df, antes, despues
         
-        # Aplicar filtro a cada base
-        adm = filtrar_ciclo(adm, "Ciclo Admisión")
-        notas = filtrar_ciclo(notas, "Ciclo")
-        prom = filtrar_ciclo(prom, "Ciclo")
-        per = filtrar_ciclo(per, "Ciclo")
+        adm, antes_adm, despues_adm = filtrar(adm, "Ciclo Admisión")
+        notas, antes_notas, despues_notas = filtrar(notas, "Ciclo")
+        prom, antes_prom, despues_prom = filtrar(prom, "Ciclo")
+        per, antes_per, despues_per = filtrar(per, "Ciclo")
         
-        # Eliminar registros con 0 créditos
-        if 'Créditos Inscritos en Ciclo' in per.columns:
-            antes_per = len(per)
-            per = per[per["Créditos Inscritos en Ciclo"] != 0].copy()
-            print(f"   → PER (0 créditos): {antes_per} → {len(per)} registros")
+        print(f"   ✓ ADM: {antes_adm} → {despues_adm}")
+        print(f"   ✓ NOTAS: {antes_notas} → {despues_notas}")
+        print(f"   ✓ PROM: {antes_prom} → {despues_prom}")
+        print(f"   ✓ PER: {antes_per} → {despues_per}")
         
-        if 'Créditos Inscritos en Ciclo' in prom.columns:
-            antes_prom = len(prom)
-            prom = prom[prom["Créditos Inscritos en Ciclo"] != 0].copy()
-            print(f"   → PROM (0 créditos): {antes_prom} → {len(prom)} registros")
-        
-        print("   ✓ Filtros aplicados")
         return notas, per, prom, adm
     
-    def _paso_7_transformar_mult_programa(self, notas, per, prom):
-        """PASO 7: Transformar Mult Programa a códigos numéricos"""
-        print("\n🔄 PASO 7: Transformando Mult Programa...")
+    def _filtrar_creditos_cero(self, per, prom):
+        """Filtrar registros con 0 créditos"""
+        print("\n🔍 Filtrando créditos = 0...")
+        
+        antes_per = len(per)
+        antes_prom = len(prom)
+        
+        per = per[per["Créditos Inscritos en Ciclo"] != 0].copy()
+        prom = prom[prom["Créditos Inscritos en Ciclo"] != 0].copy()
+        
+        print(f"   ✓ PER: {antes_per} → {len(per)}")
+        print(f"   ✓ PROM: {antes_prom} → {len(prom)}")
+        
+        return per, prom
+    
+    def _transformar_mult_programa(self, notas, per, prom):
+        """Transformar Mult Programa a códigos numéricos"""
+        print("\n🔄 Transformando Mult Programa...")
         
         transformaciones = {
-            'Pregrado': 1,
-            'Especialización': 2,
-            'Maestría': 3,
-            'Doctorado': 4,
-            'Especialidad Médica': 5,
-            'Especialidad Odontológica': 6
+            'Pregrado': 1, 'PREG': 1, 'pregrado': 1, 'preg': 1,
+            'Pregrado 2': 2, 'PRE2': 2, 'Segundo Pregrado': 2, 'pre2': 2, 'pregrado 2': 2,
+            'Tercer Pregrado': 3, 'PRE3': 3, 'Pregrado 3': 3, 'pre3': 3, 'tercer pregrado': 3, 'pregrado 3': 3,
+            'Cuarto Pregrado': 4, 'PRE4': 4, 'Pregrado 4': 4, 'pre4': 4, 'cuarto pregrado': 4, 'pregrado 4': 4
         }
         
-        def transformar(df):
-            if 'Mult Programa' not in df.columns:
-                return df
-            
-            df = df.copy()
-            df["Mult Programa"] = df["Mult Programa"].map(transformaciones).astype("Int64")
-            return df
+        per = per.copy()
+        prom = prom.copy()
+        notas = notas.copy()
         
-        per = transformar(per)
-        prom = transformar(prom)
-        notas = transformar(notas)
+        per["Mult Programa"] = per["Mult Programa"].map(transformaciones).astype("Int64")
+        prom["Mult Programa"] = prom["Mult Programa"].map(transformaciones).astype("Int64")
+        notas["Mult Programa"] = notas["Mult Programa"].map(transformaciones).astype("Int64")
         
         print("   ✓ Mult Programa transformado a códigos numéricos")
+        
         return notas, per, prom
     
-    def _paso_8_merge_per_prom_notas(self, per, prom, notas):
-        """PASO 8: Merge PER + PROM + NOTAS"""
-        print("\n🔗 PASO 8: Merge PER + PROM + NOTAS...")
-        
-        # DEBUG: Mostrar columnas disponibles
-        print(f"   📋 Columnas en NOTAS: {list(notas.columns)}")
-        print(f"   📋 Columnas en PER: {list(per.columns)[:10]}...")
-        print(f"   📋 Columnas en PROM: {list(prom.columns)[:10]}...")
-        
-        # 1. Merge PER + PROM
-        # Verificar columnas requeridas
-        cols_merge = ['ID', 'Mult Programa', 'Programa', 'Ciclo']
-        
-        # Verificar que todas las columnas existan
-        for col in cols_merge:
-            if col not in per.columns:
-                raise ValueError(f"❌ Columna '{col}' no existe en PER. Columnas disponibles: {list(per.columns)}")
-            if col not in prom.columns:
-                raise ValueError(f"❌ Columna '{col}' no existe en PROM. Columnas disponibles: {list(prom.columns)}")
-        
-        per_prom_unido = per.merge(
-            prom,
-            on=cols_merge,
-            how='inner',
-            suffixes=('_per', '_prom')
-        )
-        print(f"   → PER + PROM = {len(per_prom_unido)} registros")
-        
-        # 2. Crear columnas auxiliares para match (primeras 2 letras)
-        # En PER+PROM usar 'Prog Acad'
-        if 'Prog Acad' not in per_prom_unido.columns:
-            raise ValueError(f"❌ 'Prog Acad' no existe en PER+PROM. Columnas: {list(per_prom_unido.columns)}")
-        
-        per_prom_unido['Prog_Acad_2'] = per_prom_unido['Prog Acad'].str[:2]
-        
-        # En NOTAS buscar la columna de programa
-        # Puede ser 'Programa' o 'Programa Académico Base' dependiendo del rename
-        col_programa_notas = None
-        for possible_col in ['Programa', 'Programa Académico Base', 'Programa_Academico_Base']:
-            if possible_col in notas.columns:
-                col_programa_notas = possible_col
-                break
-        
-        if col_programa_notas is None:
-            raise ValueError(f"❌ No se encontró columna de Programa en NOTAS. Columnas disponibles: {list(notas.columns)}")
-        
-        print(f"   → Usando '{col_programa_notas}' de NOTAS")
-        notas['Programa_2'] = notas[col_programa_notas].str[:2]
-        
-        # 3. Merge (PER+PROM) + NOTAS
-        per_prom_notas = pd.merge(
-            per_prom_unido,
-            notas,
-            left_on=['ID', 'Mult Programa', 'Ciclo', 'Prog_Acad_2'],
-            right_on=['ID', 'Mult Programa', 'Ciclo', 'Programa_2'],
-            how='inner'
-        )
-        print(f"   → (PER+PROM) + NOTAS = {len(per_prom_notas)} registros")
-        
-        # 4. Eliminar columnas auxiliares
-        per_prom_notas = per_prom_notas.drop(columns=['Prog_Acad_2', 'Programa_2'])
-        
-        # 5. Renombrar Programa de NOTAS si es necesario
-        # Buscar columna que termine en _y (resultado del merge)
-        for col in per_prom_notas.columns:
-            if col.endswith('_y') and 'Programa' in col:
-                per_prom_notas = per_prom_notas.rename(columns={col: 'Programa Notas'})
-                print(f"   → Renombrado '{col}' a 'Programa Notas'")
-                break
-        
-        print("   ✓ Merge PER+PROM+NOTAS completado")
-        return per_prom_notas
+    # ============================================================================
+    # FASE 5: MERGE DE BASES
+    # ============================================================================
     
-    def _paso_9_merge_adm(self, per_prom_notas, adm):
-        """PASO 9: Merge con ADM"""
-        print("\n🔗 PASO 9: Merge con ADM...")
+    def _merge_todas_bases(self, per, prom, notas, adm):
+        """Merge de todas las bases"""
+        print("\n🔗 Merge de bases...")
         
-        # 1. Merge con ADM
-        per_prom_notas_adm = per_prom_notas.merge(
-            adm,
-            on=["ID", "Programa"],
-            how="left",
-            suffixes=("_ppn", "_adm")
-        )
-        print(f"   → (PER+PROM+NOTAS) + ADM = {len(per_prom_notas_adm)} registros")
+        # 1. PER + PROM
+        per_prom = per.merge(prom, on=['ID', 'Mult Programa', 'Programa', 'Ciclo'], 
+                            how='inner', suffixes=('_per', '_prom'))
+        print(f"   ✓ PER + PROM = {len(per_prom)} registros")
         
-        # 2. Resolver duplicados (preferir _ppn sobre _adm, _prom sobre _per)
+        # 2. (PER+PROM) + NOTAS (con match de primeras 2 letras)
+        per_prom['Prog_Acad_2'] = per_prom['Prog Acad'].str[:2]
+        notas['Programa_2'] = notas['Programa'].str[:2]
+        
+        per_prom_notas = pd.merge(per_prom, notas,
+                                 left_on=['ID', 'Mult Programa', 'Ciclo', 'Prog_Acad_2'],
+                                 right_on=['ID', 'Mult Programa', 'Ciclo', 'Programa_2'],
+                                 how='inner')
+        
+        per_prom_notas = per_prom_notas.drop(columns=['Prog_Acad_2', 'Programa_2'])
+        per_prom_notas = per_prom_notas.rename(columns={'Programa_x': 'Programa', 'Programa_y': 'Siglas Programa'})
+        
+        print(f"   ✓ (PER+PROM) + NOTAS = {len(per_prom_notas)} registros")
+        
+        # 3. (PER+PROM+NOTAS) + ADM
+        data_completa = per_prom_notas.merge(adm, on=["ID", "Programa"], how="left", suffixes=("_ppn", "_adm"))
+        
+        print(f"   ✓ (PER+PROM+NOTAS) + ADM = {len(data_completa)} registros")
+        
+        return data_completa
+    
+    # ============================================================================
+    # FASE 6: RESOLVER DUPLICADOS
+    # ============================================================================
+    
+    def _resolver_duplicados(self, data):
+        """Resolver columnas duplicadas y eliminar Acción/Motivo"""
+        print("\n🧹 Resolviendo duplicados...")
         
         # Créd.Inscritos y Aprobados Ciclo (preferir _prom)
-        if "Créd.Inscritos y Aprobados Ciclo_per" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=["Créd.Inscritos y Aprobados Ciclo_per"])
-        if "Créd.Inscritos y Aprobados Ciclo_prom" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.rename(columns={
-                "Créd.Inscritos y Aprobados Ciclo_prom": "Créd.Inscritos y Aprobados Ciclo"
-            })
+        if "Créd.Inscritos y Aprobados Ciclo_per" in data.columns:
+            data = data.drop(columns=["Créd.Inscritos y Aprobados Ciclo_per"])
+        if "Créd.Inscritos y Aprobados Ciclo_prom" in data.columns:
+            data = data.rename(columns={"Créd.Inscritos y Aprobados Ciclo_prom": "Créd.Inscritos y Aprobados Ciclo"})
         
-        # Ciudad (Dirección) (preferir _ppn)
-        if "Ciudad (Dirección)_adm" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=["Ciudad (Dirección)_adm"])
-        if "Ciudad (Dirección)_ppn" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.rename(columns={
-                "Ciudad (Dirección)_ppn": "Ciudad (Dirección)"
-            })
+        # Ciudad (preferir _ppn)
+        if "Ciudad (Dirección)_adm" in data.columns:
+            data = data.drop(columns=["Ciudad (Dirección)_adm"])
+        if "Ciudad (Dirección)_ppn" in data.columns:
+            data = data.rename(columns={"Ciudad (Dirección)_ppn": "Ciudad (Dirección)"})
         
         # Ciclo Admisión (preferir _prom)
-        if "Ciclo Admisión_per" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=["Ciclo Admisión_per"])
+        if "Ciclo Admisión_per" in data.columns:
+            data = data.drop(columns=["Ciclo Admisión_per"])
         
         # Sexo (preferir _ppn)
-        if "Sexo_adm" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=["Sexo_adm"])
-        if "Sexo_ppn" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.rename(columns={
-                "Sexo_ppn": "Sexo"
-            })
+        if "Sexo_adm" in data.columns:
+            data = data.drop(columns=["Sexo_adm"])
+        if "Sexo_ppn" in data.columns:
+            data = data.rename(columns={"Sexo_ppn": "Sexo"})
         
-        # Eliminar TODAS las columnas de Colegio
-        cols_colegio = per_prom_notas_adm.filter(regex="^Colegio").columns.tolist()
+        # Eliminar Colegio
+        cols_colegio = data.filter(regex="^Colegio").columns.tolist()
         if cols_colegio:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=cols_colegio)
+            data = data.drop(columns=cols_colegio)
         
         # F Nacimiento (preferir _ppn)
-        if "F Nacimiento_adm" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.drop(columns=["F Nacimiento_adm"])
-        if "F Nacimiento_ppn" in per_prom_notas_adm.columns:
-            per_prom_notas_adm = per_prom_notas_adm.rename(columns={
-                "F Nacimiento_ppn": "F Nacimiento"
-            })
-        
-        print("   ✓ Merge con ADM completado")
-        return per_prom_notas_adm
-    
-    def _paso_10_resolver_duplicados(self, data):
-        """PASO 10: Resolver duplicados y ELIMINAR Acción/Motivo"""
-        print("\n🧹 PASO 10: Resolviendo duplicados y eliminando Acción/Motivo...")
+        if "F Nacimiento_adm" in data.columns:
+            data = data.drop(columns=["F Nacimiento_adm"])
+        if "F Nacimiento_ppn" in data.columns:
+            data = data.rename(columns={"F Nacimiento_ppn": "F Nacimiento"})
         
         # Dpto Nacimiento (preferir _ppn)
         if "Dpto Nacimiento_adm" in data.columns:
             data = data.drop(columns=["Dpto Nacimiento_adm"])
         if "Dpto Nacimiento_ppn" in data.columns:
-            data = data.rename(columns={
-                "Dpto Nacimiento_ppn": "Dpto Nacimiento"
-            })
+            data = data.rename(columns={"Dpto Nacimiento_ppn": "Dpto Nacimiento"})
         
         # País Nacimiento (preferir _ppn)
         if "País Nacimiento_adm" in data.columns:
             data = data.drop(columns=["País Nacimiento_adm"])
         if "País Nacimiento_ppn" in data.columns:
-            data = data.rename(columns={
-                "País Nacimiento_ppn": "País Nacimiento"
-            })
+            data = data.rename(columns={"País Nacimiento_ppn": "País Nacimiento"})
         
-        # Eliminar Siglas Programa si existe
+        # Eliminar Siglas Programa
         if "Siglas Programa" in data.columns:
             data = data.drop(columns=["Siglas Programa"])
         
-        # Copiar a data_final
-        data_final = data.copy()
+        # Eliminar Ciclo Admisión duplicado
+        if "Ciclo Admisión_prom" in data.columns:
+            data = data.drop(columns=["Ciclo Admisión_prom"])
         
-        # Eliminar otros duplicados
-        if "Ciclo Admisión_prom" in data_final.columns:
-            data_final = data_final.drop(columns=["Ciclo Admisión_prom"])
+        # Eliminar Dropout
+        if "Dropout" in data.columns:
+            data = data.drop(columns=["Dropout"])
         
-        if "Dropout" in data_final.columns:
-            data_final = data_final.drop(columns=["Dropout"])
+        # Estado (preferir _per)
+        if "Estado_prom" in data.columns and "Estado_ppn" in data.columns:
+            data = data.drop(columns=["Estado_prom", "Estado_ppn"])
+        if "Estado_per" in data.columns:
+            data = data.rename(columns={"Estado_per": "Estado"})
         
-        cols_estado = [c for c in ["Estado_prom", "Estado_ppn"] if c in data_final.columns]
-        if cols_estado:
-            data_final = data_final.drop(columns=cols_estado)
-        
-        if "Estado_per" in data_final.columns:
-            data_final = data_final.rename(columns={"Estado_per": "Estado"})
-        
-        # ⚠️ CRÍTICO: ELIMINAR TODAS LAS COLUMNAS DE ACCIÓN
-        accion_cols = data_final.filter(regex="^Acción").columns.tolist()
+        # ⚠️ ELIMINAR ACCIÓN Y MOTIVO
+        accion_cols = data.filter(regex="^Acción").columns.tolist()
         if accion_cols:
-            print(f"   → Eliminando {len(accion_cols)} columnas de Acción: {accion_cols}")
-            data_final = data_final.drop(columns=accion_cols)
+            data = data.drop(columns=accion_cols)
+            print(f"   ✓ Eliminadas {len(accion_cols)} columnas de Acción")
         
-        # ⚠️ CRÍTICO: ELIMINAR TODAS LAS COLUMNAS DE MOTIVO
-        motivo_cols = data_final.filter(regex="^Motivo").columns.tolist()
+        motivo_cols = data.filter(regex="^Motivo").columns.tolist()
         if motivo_cols:
-            print(f"   → Eliminando {len(motivo_cols)} columnas de Motivo: {motivo_cols}")
-            data_final = data_final.drop(columns=motivo_cols)
+            data = data.drop(columns=motivo_cols)
+            print(f"   ✓ Eliminadas {len(motivo_cols)} columnas de Motivo")
         
-        print("   ✓ Duplicados resueltos y Acción/Motivo eliminados")
-        return data_final
+        print("   ✓ Duplicados resueltos")
+        
+        return data
     
-    def _paso_11_calcular_siglas_prog(self, data):
-        """PASO 11: Calcular Siglas Prog usando MODA"""
-        print("\n📊 PASO 11: Calculando Siglas Prog (moda)...")
+    # ============================================================================
+    # FASE 7: CALCULAR SIGLAS PROG
+    # ============================================================================
+    
+    def _calcular_siglas_prog(self, data):
+        """Calcular Siglas Prog usando moda"""
+        print("\n📊 Calculando Siglas Prog...")
         
-        # PARTE A: Calcular moda de Prog Acad_ppn
+        # Moda de Prog Acad_ppn
         if "Prog Acad_ppn" in data.columns:
-            moda_por_grupo = (
+            moda_ppn = (
                 data.groupby(["Mult Programa", "Programa"])["Prog Acad_ppn"]
                 .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
                 .reset_index()
                 .rename(columns={"Prog Acad_ppn": "Prog Acad_ppn_moda"})
             )
             
-            data = data.merge(moda_por_grupo, on=["Mult Programa", "Programa"], how="left")
+            data = data.merge(moda_ppn, on=["Mult Programa", "Programa"], how="left")
             data["Prog Acad_ppn_normalizado"] = data["Prog Acad_ppn_moda"]
             data = data.drop(columns=["Prog Acad_ppn_moda"])
-            
-            print(f"   ✓ Prog Acad_ppn normalizado calculado")
+            print("   ✓ Prog Acad_ppn normalizado")
         
-        # PARTE B: Calcular moda de Prog Acad_adm
+        # Moda de Prog Acad_adm (híbrido)
         if "Prog Acad_adm" in data.columns:
-            moda_por_grupo_adm = (
+            moda_adm = (
                 data.groupby(["Mult Programa", "Programa"])["Prog Acad_adm"]
                 .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
                 .reset_index()
                 .rename(columns={"Prog Acad_adm": "Prog Acad_adm_moda"})
             )
             
-            data = data.merge(moda_por_grupo_adm, on=["Mult Programa", "Programa"], how="left")
+            data = data.merge(moda_adm, on=["Mult Programa", "Programa"], how="left")
             
-            # Función de normalización híbrida
             def normalizar_adm(row):
                 original = row.get("Prog Acad_adm")
                 moda = row.get("Prog Acad_adm_moda")
-                
                 if pd.isna(moda):
                     return original
-                
-                # Buscar si el original tiene un número al final
                 match = re.search(r"\d+$", str(original))
                 if match:
-                    numero = match.group()
-                    return str(moda) + str(numero)
-                else:
-                    return moda
+                    return str(moda) + match.group()
+                return moda
             
             data["Prog Acad_adm_normalizado"] = data.apply(normalizar_adm, axis=1)
             data = data.drop(columns=["Prog Acad_adm_moda"])
-            
-            print(f"   ✓ Prog Acad_adm normalizado calculado")
+            print("   ✓ Prog Acad_adm normalizado")
         
-        print("   ✓ Siglas Prog (moda) calculadas")
-        return data
-    
-    def _paso_12_crear_siglas_prog(self, data):
-        """PASO 12: Quitar penúltimo carácter y crear Siglas Prog"""
-        print("\n✂️  PASO 12: Creando Siglas Prog final...")
-        
-        # Función para quitar penúltimo carácter
+        # Quitar penúltimo
         def quitar_penultimo(valor):
             if pd.isna(valor):
                 return valor
@@ -934,66 +777,211 @@ class DataProcessorLimpieza:
                 return valor[:-2] + valor[-1]
             return valor
         
-        # Aplicar a Prog Acad_adm_normalizado
         if "Prog Acad_adm_normalizado" in data.columns:
             data["Prog Acad_adm_normalizado"] = data["Prog Acad_adm_normalizado"].apply(quitar_penultimo)
         
-        # Eliminar columnas originales
-        cols_drop = ["Prog Acad_ppn", "Prog Acad_adm"]
-        cols_drop = [c for c in cols_drop if c in data.columns]
-        if cols_drop:
-            data = data.drop(columns=cols_drop)
+        # Crear Siglas Prog
+        if "Prog Acad_ppn" in data.columns:
+            data = data.drop(columns=["Prog Acad_ppn"])
+        if "Prog Acad_adm" in data.columns:
+            data = data.drop(columns=["Prog Acad_adm"])
         
-        # Renombrar normalizados a "Siglas Prog"
         if "Prog Acad_ppn_normalizado" in data.columns:
-            data = data.rename(columns={
-                "Prog Acad_ppn_normalizado": "Siglas Prog"
-            })
+            data = data.rename(columns={"Prog Acad_ppn_normalizado": "Siglas Prog"})
         
         if "Prog Acad_adm_normalizado" in data.columns:
-            data = data.rename(columns={
-                "Prog Acad_adm_normalizado": "Siglas Prog ADM"
-            })
+            data = data.rename(columns={"Prog Acad_adm_normalizado": "Siglas Prog ADM"})
         
-        # Eliminar columnas adicionales
+        # Eliminar extras
         cols_drop = ["Fecha Grado", "Estado_adm", "Siglas Prog ADM"]
-        cols_drop = [c for c in cols_drop if c in data.columns]
-        if cols_drop:
-            data = data.drop(columns=cols_drop)
+        cols_found = [c for c in cols_drop if c in data.columns]
+        if cols_found:
+            data = data.drop(columns=cols_found)
         
-        print("   ✓ Siglas Prog creadas")
+        print("   ✓ Siglas Prog creada")
+        
         return data
     
-    def _paso_13_rellenar_dpto_pais(self, data):
-        """PASO 13: Rellenar Dpto y País Nacimiento"""
-        print("\n📝 PASO 13: Rellenando Dpto y País Nacimiento...")
+    # ============================================================================
+    # FASE 8: LIMPIEZA GEOGRÁFICA
+    # ============================================================================
+    
+    def _limpieza_geografica(self, data):
+        """Limpieza de ciudades y departamentos"""
+        print("\n🗺️ Limpieza geográfica...")
         
-        # Rellenar Dpto Nacimiento nulos con "Otro"
+        # Rellenar Dpto y País con "Otro"
         if "Dpto Nacimiento" in data.columns:
-            nulos_dpto = data["Dpto Nacimiento"].isnull().sum()
-            if nulos_dpto > 0:
-                data["Dpto Nacimiento"] = data["Dpto Nacimiento"].fillna("Otro")
-                print(f"   → Dpto Nacimiento: {nulos_dpto} nulos rellenados con 'Otro'")
+            nulos = data["Dpto Nacimiento"].isnull().sum()
+            data["Dpto Nacimiento"] = data["Dpto Nacimiento"].fillna("Otro")
+            print(f"   ✓ Dpto Nacimiento: {nulos} nulos → 'Otro'")
         
-        # Rellenar País Nacimiento nulos con "Otro"
         if "País Nacimiento" in data.columns:
-            nulos_pais = data["País Nacimiento"].isnull().sum()
-            if nulos_pais > 0:
-                data["País Nacimiento"] = data["País Nacimiento"].fillna("Otro")
-                print(f"   → País Nacimiento: {nulos_pais} nulos rellenados con 'Otro'")
+            nulos = data["País Nacimiento"].isnull().sum()
+            data["País Nacimiento"] = data["País Nacimiento"].fillna("Otro")
+            print(f"   ✓ País Nacimiento: {nulos} nulos → 'Otro'")
         
-        # Crear columna "internacional"
+        # Crear internacional
         if "País Nacimiento" in data.columns:
-            data["internacional"] = data["País Nacimiento"].apply(
-                lambda x: 0 if x == "COL" else 1
-            )
-            print("   ✓ Columna 'internacional' creada")
+            data["internacional"] = data["País Nacimiento"].apply(lambda x: 0 if x == "COL" else 1)
+            print("   ✓ Variable 'internacional' creada")
         
         # Eliminar ID Colegio
         if "ID Colegio" in data.columns:
             data = data.drop(columns=["ID Colegio"])
         
-        print("   ✓ Dpto y País Nacimiento rellenados")
+        # Rellenar Ciudad desde Estado (Dirección)
+        if "Ciudad (Dirección)" in data.columns and "Estado (Dirección)" in data.columns:
+            mapa_ciudad_dpto = (
+                data.dropna(subset=["Estado (Dirección)", "Ciudad (Dirección)"])
+                .groupby("Estado (Dirección)")["Ciudad (Dirección)"]
+                .agg(lambda x: x.mode().iloc[0])
+                .to_dict()
+            )
+            
+            data["Ciudad (Dirección)"] = data.apply(
+                lambda row: mapa_ciudad_dpto.get(row["Estado (Dirección)"], row["Ciudad (Dirección)"])
+                if pd.isnull(row["Ciudad (Dirección)"]) and pd.notnull(row["Estado (Dirección)"])
+                else row["Ciudad (Dirección)"],
+                axis=1
+            )
+            print("   ✓ Ciudad rellenada desde Estado")
+        
+        # Reemplazar ciudades numéricas
+        if "Ciudad (Dirección)" in data.columns:
+            mask_numericos = data["Ciudad (Dirección)"].apply(lambda x: str(x).isdigit())
+            if "Estado (Dirección)" in data.columns:
+                mask_bog = mask_numericos & (data["Estado (Dirección)"] == "BOG")
+                data.loc[mask_bog, "Ciudad (Dirección)"] = "BOG"
+            
+            mapeo_ciudades = {
+                "25899": "Zipaquira", "25473": "Mosquera", "25214": "Cota",
+                "25126": "Cajica", "25269": "El Rosal", "25175": "Chia",
+                "25843": "Tocancipa", "5001": "Medellin"
+            }
+            
+            data["Ciudad (Dirección)"] = data["Ciudad (Dirección)"].apply(
+                lambda x: mapeo_ciudades.get(str(x).strip(), x)
+            )
+            
+            # Rellenar nulos con "Otro"
+            nulos = data["Ciudad (Dirección)"].isnull().sum()
+            data["Ciudad (Dirección)"] = data["Ciudad (Dirección)"].fillna("Otro")
+            print(f"   ✓ Ciudad: códigos reemplazados, {nulos} nulos → 'Otro'")
+        
+        # Eliminar columnas geográficas auxiliares
+        cols_drop = ["Estado (Dirección)", "País (Dirección)", "Ciudad Nacimiento"]
+        cols_found = [c for c in cols_drop if c in data.columns]
+        if cols_found:
+            data = data.drop(columns=cols_found)
+        
+        return data
+    
+    # ============================================================================
+    # FASE 9: RELLENAR DATOS FALTANTES
+    # ============================================================================
+    
+    def _rellenar_datos_faltantes(self, data):
+        """Rellenar datos faltantes"""
+        print("\n📝 Rellenando datos faltantes...")
+        
+        # Benef. Beca
+        if "Benef. Beca" in data.columns:
+            mask_vacios = data["Benef. Beca"].isnull() | (data["Benef. Beca"].astype(str).str.strip() == "")
+            nulos = mask_vacios.sum()
+            data.loc[mask_vacios, "Benef. Beca"] = "N"
+            print(f"   ✓ Benef. Beca: {nulos} vacíos → 'N'")
+        
+        # Tipo Admisión
+        if "Tipo Admisión" in data.columns:
+            moda = data["Tipo Admisión"].mode().iloc[0] if len(data["Tipo Admisión"].mode()) > 0 else "TRL"
+            mask_vacios = data["Tipo Admisión"].isnull() | (data["Tipo Admisión"].astype(str).str.strip() == "")
+            nulos = mask_vacios.sum()
+            data.loc[mask_vacios, "Tipo Admisión"] = moda
+            print(f"   ✓ Tipo Admisión: {nulos} vacíos → '{moda}'")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 10: CALCULAR EDAD
+    # ============================================================================
+    
+    def _calcular_edad(self, data):
+        """Calcular edad desde F Nacimiento o moda por ciclo"""
+        print("\n🎂 Calculando edad...")
+        
+        if "F Nacimiento" not in data.columns or "Ciclo" not in data.columns:
+            print("   ⚠️ No se puede calcular edad (faltan columnas)")
+            return data
+        
+        # Convertir Ciclo a fecha
+        def ciclo_a_fecha(ciclo):
+            try:
+                ciclo_int = int(ciclo)
+                ciclo_str = str(ciclo_int).zfill(4)
+                anio_num = int(ciclo_str[:-2])
+                anio = 2000 + anio_num
+                ultimos_dos = int(ciclo_str[-2:])
+                mes = 1 if ultimos_dos == 10 else 7
+                return datetime(anio, mes, 20)
+            except:
+                return None
+        
+        data["Fecha_Ciclo"] = data["Ciclo"].apply(ciclo_a_fecha)
+        
+        # Calcular edad
+        def calcular_edad_anos(nacimiento, fecha_ciclo):
+            if pd.isnull(nacimiento) or pd.isnull(fecha_ciclo):
+                return pd.NA
+            try:
+                edad = fecha_ciclo.year - nacimiento.year
+                if (fecha_ciclo.month, fecha_ciclo.day) < (nacimiento.month, nacimiento.day):
+                    edad -= 1
+                return edad
+            except:
+                return pd.NA
+        
+        data["Edad"] = data.apply(lambda row: calcular_edad_anos(row["F Nacimiento"], row["Fecha_Ciclo"]), axis=1)
+        
+        # Rellenar edad nula con moda por ciclo
+        def ciclo_a_anio(ciclo):
+            try:
+                ciclo = int(ciclo)
+                return 2000 + ciclo // 100
+            except:
+                return None
+        
+        data["Anio_Ciclo"] = data["Ciclo"].apply(ciclo_a_anio)
+        moda_por_ciclo = data.groupby("Ciclo")["Edad"].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
+        
+        rellenados = 0
+        for student_id, group in data[data["Edad"].isna()].groupby("ID"):
+            group_sorted = group.sort_values("Ciclo")
+            primer_ciclo = group_sorted.iloc[0]["Ciclo"]
+            anio_inicial = group_sorted.iloc[0]["Anio_Ciclo"]
+            edad_inicial = moda_por_ciclo.get(primer_ciclo, None)
+            
+            if edad_inicial is not None:
+                edad_actual = edad_inicial
+                anio_anterior = anio_inicial
+                
+                for idx, row in group_sorted.iterrows():
+                    anio_ciclo = row["Anio_Ciclo"]
+                    if anio_ciclo > anio_anterior:
+                        edad_actual += anio_ciclo - anio_anterior
+                        anio_anterior = anio_ciclo
+                    data.at[idx, "Edad"] = edad_actual
+                    rellenados += 1
+        
+        # Eliminar columnas auxiliares
+        cols_drop = ["F Nacimiento", "Fecha_Ciclo", "Anio_Ciclo"]
+        cols_found = [c for c in cols_drop if c in data.columns]
+        if cols_found:
+            data = data.drop(columns=cols_found)
+        
+        print(f"   ✓ Edad calculada ({rellenados} valores rellenados con moda)")
+        print(f"   ✓ Nulos restantes en Edad: {data['Edad'].isna().sum()}")
+        
         return data
 
 
@@ -1001,7 +989,7 @@ class DataProcessorLimpieza:
 # FUNCIÓN PRINCIPAL PARA STREAMLIT
 # =============================================================================
 
-def procesar_y_descargar_limpieza(notas_df, per_df, prom_df, adm_df):
+def procesar_limpieza_completa(notas_df, per_df, prom_df, adm_df):
     """
     Función para usar en Streamlit que procesa y retorna DataFrame limpio
     
@@ -1009,9 +997,9 @@ def procesar_y_descargar_limpieza(notas_df, per_df, prom_df, adm_df):
         notas_df, per_df, prom_df, adm_df: DataFrames de las 4 hojas
         
     Returns:
-        DataFrame limpio listo para descargar
+        DataFrame limpio (sin dumificación)
     """
-    procesador = DataProcessorLimpieza()
+    procesador = DataProcessorLimpiezaCompleto()
     data_limpia = procesador.procesar_dataframes(notas_df, per_df, prom_df, adm_df)
     return data_limpia
 
@@ -1021,17 +1009,6 @@ def procesar_y_descargar_limpieza(notas_df, per_df, prom_df, adm_df):
 # =============================================================================
 
 if __name__ == "__main__":
-    # Ejemplo de cómo usar el procesador
-    procesador = DataProcessorLimpieza()
-    
-    # Opción 1: Desde archivo Excel
+    procesador = DataProcessorLimpiezaCompleto()
     # data_limpia = procesador.procesar_desde_excel("tu_archivo.xlsx")
-    
-    # Opción 2: Desde DataFrames
-    # data_limpia = procesador.procesar_dataframes(notas_df, per_df, prom_df, adm_df)
-    
-    # Guardar resultado
-    # data_limpia.to_excel("base_limpia.xlsx", index=False)
-    # data_limpia.to_csv("base_limpia.csv", index=False)
-    
-    print("\n✅ Procesador de limpieza listo para usar")
+    print("\n✅ Procesador de limpieza COMPLETO listo")
