@@ -28,6 +28,7 @@ class DataProcessorAjustes:
         """
         self.per_original = per_original
         self.columnas_modelo = None
+        self.mapeo_columnas = None  # Nuevo: diccionario de renombres
         
         if columnas_modelo_path:
             self._cargar_columnas_modelo(columnas_modelo_path)
@@ -37,11 +38,15 @@ class DataProcessorAjustes:
     def _cargar_columnas_modelo(self, path: str):
         """Carga el mapeo de columnas desde Excel"""
         try:
+            # Hoja3: mapeo de nombres antiguos → nuevos
             nombres = pd.read_excel(path, sheet_name='Hoja3', header=None)
-            self.columnas_modelo = list(nombres[1])
-            print(f"   ✓ Columnas del modelo cargadas: {len(self.columnas_modelo)} columnas")
+            self.mapeo_columnas = dict(zip(nombres[0], nombres[1]))
+            self.columnas_modelo = list(nombres[1])  # Columnas finales (nuevas)
+            print(f"   ✓ Mapeo de columnas cargado: {len(self.mapeo_columnas)} renombres")
+            print(f"   ✓ Columnas del modelo: {len(self.columnas_modelo)} columnas")
         except Exception as e:
             print(f"   ⚠️ Error al cargar columnas del modelo: {e}")
+            self.mapeo_columnas = None
             self.columnas_modelo = None
     
     def procesar(self, data_encoded: pd.DataFrame, 
@@ -542,30 +547,40 @@ class DataProcessorAjustes:
         print("\n📋 Aplicando columnas del modelo...")
         
         if not self.columnas_modelo:
-            print("   ⚠️ Columnas del modelo no cargadas")
+            print("   ⚠️ Columnas del modelo no cargadas, saltando...")
             return data
         
-        # Eliminar 'desercion' de columnas_modelo si existe
-        data = data.drop(columns=['desercion'], errors='ignore')
+        # PASO 1: Renombrar columnas usando mapeo (Hoja3)
+        if self.mapeo_columnas:
+            print(f"   🔄 Renombrando columnas usando mapeo...")
+            columnas_antes = len(data.columns)
+            
+            # Solo renombrar las que existen en el mapeo
+            renombres_aplicados = {k: v for k, v in self.mapeo_columnas.items() if k in data.columns}
+            data = data.rename(columns=renombres_aplicados)
+            
+            print(f"      ✓ {len(renombres_aplicados)} columnas renombradas")
         
-        # Renombrar usando Libro1.xlsx Hoja3 si está disponible
-        # (esto se hizo en el código original pero no tenemos el mapeo aquí)
+        # PASO 2: Aplicar columnas deseadas (columnas_modelo)
+        print(f"   📝 Aplicando selección de columnas...")
         
-        # Columnas existentes
+        # Columnas existentes en data que están en columnas_modelo
         cols_existentes = [col for col in self.columnas_modelo if col in data.columns]
         
         # Columnas con "_" que no existen → crear con 0
         cols_a_crear = [col for col in self.columnas_modelo if "_" in col and col not in data.columns]
         
-        for col in cols_a_crear:
-            data[col] = 0
+        if cols_a_crear:
+            print(f"      ✓ Creando {len(cols_a_crear)} columnas faltantes con 0")
+            for col in cols_a_crear:
+                data[col] = 0
         
-        # Ordenar según columnas_modelo
+        # PASO 3: Ordenar según columnas_modelo (mantener solo las deseadas)
         data = data[cols_existentes + cols_a_crear]
         
-        print(f"   ✓ Columnas aplicadas: {len(data.columns)} columnas")
+        print(f"   ✓ Columnas finales: {len(data.columns)}")
         print(f"      - Existentes: {len(cols_existentes)}")
-        print(f"      - Creadas (con 0): {len(cols_a_crear)}")
+        print(f"      - Creadas: {len(cols_a_crear)}")
         
         return data
     
