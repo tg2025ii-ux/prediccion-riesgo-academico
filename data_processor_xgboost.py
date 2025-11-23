@@ -36,11 +36,17 @@ class DataProcessorXGBoost:
             scaler_path = 'scaler.pkl'
             columnas_path = 'columnas.pkl'
             
+            print("🔍 DEBUG: Iniciando carga del modelo...")
+            print(f"   Ruta esperada: {modelo_path}")
+            print(f"   Directorio actual: {os.getcwd()}")
+            print(f"   Archivos en directorio: {os.listdir('.')[:10]}")
+            
             # Intentar descargar si no existe
             if not os.path.exists(modelo_path):
                 print("🔍 Modelo no encontrado localmente, intentando descargar...")
                 self._descargar_modelo()
             
+            # Verificar que existe después de descargar
             if not os.path.exists(modelo_path):
                 raise FileNotFoundError(
                     f"❌ Modelo no encontrado: {modelo_path}\n"
@@ -48,7 +54,11 @@ class DataProcessorXGBoost:
                     f"   O sube 'xgboost_modelo.pkl' manualmente a la raíz del proyecto"
                 )
             
+            print(f"✓ Archivo encontrado: {modelo_path}")
+            print(f"  Tamaño: {os.path.getsize(modelo_path) / 1024 / 1024:.2f} MB")
+            
             # Cargar modelo
+            print("  Cargando modelo con joblib...")
             self.modelo = joblib.load(modelo_path)
             print("✅ Modelo XGBoost cargado exitosamente")
             
@@ -70,6 +80,10 @@ class DataProcessorXGBoost:
             
         except Exception as e:
             print(f"❌ Error cargando modelo: {str(e)}")
+            print(f"   Tipo de error: {type(e).__name__}")
+            import traceback
+            print(f"   Traceback completo:")
+            traceback.print_exc()
             self.modelo = None
             self.scaler = None
             self.columnas_modelo = None
@@ -89,7 +103,7 @@ class DataProcessorXGBoost:
                 import gdown
                 
                 # ID del archivo en Google Drive
-                file_id = "1VLySTpc2m4soxTEjTi7xUSJcXyrF00JF" 
+                file_id = "1VLySTpc2m4soxTEjTi7xUSJcXyrF00JF"
                 
                 # Método 1: Intentar con gdown normal
                 url = f"https://drive.google.com/uc?id={file_id}"
@@ -472,10 +486,18 @@ class DataProcessorXGBoost:
         Returns:
             DataFrame con probabilidades y nivel de riesgo
         """
-        if self.modelo is None:
-            raise ValueError("❌ Modelo no cargado. Verifica que xgboost_modelo.pkl exista en /models")
+        print("\n🎯 INICIANDO PREDICCIÓN...")
+        print(f"   Estado del modelo: {'✅ Cargado' if self.modelo is not None else '❌ NO cargado'}")
+        print(f"   Registros a predecir: {len(data)}")
         
-        print("\n🎯 Realizando predicciones con XGBoost...")
+        if self.modelo is None:
+            raise ValueError(
+                "❌ Modelo no cargado. Verifica que xgboost_modelo.pkl exista en la raíz del proyecto\n"
+                "   El modelo debería haberse descargado automáticamente desde Google Drive.\n"
+                "   Revisa los logs para ver si hubo errores en la descarga o carga."
+            )
+        
+        print("🎯 Realizando predicciones con XGBoost...")
         
         try:
             # Preparar datos para el modelo
@@ -516,6 +538,8 @@ class DataProcessorXGBoost:
             
         except Exception as e:
             print(f"❌ Error en predicción: {str(e)}")
+            import traceback
+            traceback.print_exc()
             raise
     
     def get_summary_stats(self, df: pd.DataFrame) -> Dict:
