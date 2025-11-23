@@ -19,7 +19,7 @@ class DataProcessorXGBoost:
     Implementa el proceso completo del Pipeline__2_.ipynb
     """
     
-    def __init__(self, model_dir='models'):
+    def __init__(self, model_dir='.'):
         """
         Inicializa el procesador y carga el modelo XGBoost
         
