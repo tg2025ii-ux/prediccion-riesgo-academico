@@ -1,29 +1,45 @@
 """
-Componente Streamlit para probar PASO 1: LIMPIEZA
+Componente Streamlit para probar LIMPIEZA COMPLETA
 Permite descargar la base limpia
 """
 
 import streamlit as st
 import pandas as pd
 import io
-from data_processor_limpieza import DataProcessorLimpieza
+from data_processor_limpieza_COMPLETO import DataProcessorLimpiezaCompleto
 
 def seccion_limpieza():
     """
     Sección de Streamlit para probar la limpieza (Pasos 1-13)
     """
-    st.header("🧹 PASO 1: LIMPIEZA Y PREPARACIÓN")
+    st.header("🧹 LIMPIEZA COMPLETA (10 FASES)")
     st.markdown("""
     Esta sección procesa las 4 bases y genera una base limpia aplicando:
-    - ✅ Renombres de columnas
-    - ✅ Eliminación de IDs fallecidos
-    - ✅ Filtros de ciclos y créditos
-    - ✅ Transformación de Mult Programa
+    
+    **FASE 0: Preparación de NOTAS**
+    - ✅ Limpieza inicial de NOTAS
+    - ✅ Consolidación (estructura base + Dropout)
+    - ✅ Métricas de calificaciones (11 variables)
+    - ✅ Métricas adicionales (3 variables)
+    
+    **FASE 1: Filtros Iniciales**
+    - ✅ Eliminar ciclos máximos
+    - ✅ Eliminar UCollege Javeriano
+    - ✅ Filtrar ADM activos
+    - ✅ IDs comunes
+    
+    **FASE 2-10: Transformaciones**
+    - ✅ Rellenar Ciclo Admisión
+    - ✅ Renombres y eliminación de columnas
+    - ✅ Filtros de calidad (fallecidos, ciclos 10/30, créditos)
     - ✅ Merge de las 4 bases
     - ✅ Resolución de duplicados
     - ✅ **Eliminación de Acción y Motivo**
     - ✅ Cálculo de Siglas Prog (moda)
-    - ✅ Relleno de datos
+    - ✅ Limpieza geográfica (ciudades, departamentos)
+    - ✅ Cálculo de Edad
+    
+    **Resultado**: Base limpia lista para encoding (dumificación)
     """)
     
     # Subir archivo
@@ -57,10 +73,10 @@ def seccion_limpieza():
                     st.metric("ADM", f"{len(adm)} registros")
             
             # Botón para procesar
-            if st.button("🚀 PROCESAR LIMPIEZA", type="primary"):
-                with st.spinner("⏳ Procesando limpieza (Pasos 1-13)..."):
+            if st.button("🚀 PROCESAR LIMPIEZA COMPLETA", type="primary"):
+                with st.spinner("⏳ Procesando limpieza completa (10 fases)..."):
                     # Crear procesador
-                    procesador = DataProcessorLimpieza()
+                    procesador = DataProcessorLimpiezaCompleto()
                     
                     # Capturar logs en un expander
                     with st.expander("📋 Ver logs de procesamiento", expanded=True):
@@ -184,8 +200,59 @@ def seccion_limpieza():
             else:
                 st.error("❌ Siglas Prog NO fue creada")
             
-            # 3. Verificar columnas con sufijos
-            st.write("**3. ¿Existen columnas con sufijos?**")
+            # 3. Verificar variable Dropout
+            st.write("**3. ¿Existe la variable Dropout?**")
+            if 'Dropout' in data_limpia.columns:
+                dropout_count = data_limpia['Dropout'].value_counts()
+                st.success("✅ Variable Dropout creada correctamente")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Sin deserción (0)", dropout_count.get(0, 0))
+                with col2:
+                    st.metric("En deserción (1)", dropout_count.get(1, 0))
+            else:
+                st.error("❌ Variable Dropout NO fue creada")
+            
+            # 4. Verificar métricas de calificaciones
+            st.write("**4. ¿Se calcularon métricas de calificaciones?**")
+            metricas_esperadas = [
+                'Promedio_Ciclo', 'Des_Estandar_Ciclo', 
+                'Min_Ciclo', 'Max_Ciclo', 
+                'Clase_Min_Ciclo', 'Clase_Max_Ciclo',
+                'Rango_Ponderado_Ciclo'
+            ]
+            metricas_encontradas = [m for m in metricas_esperadas if m in data_limpia.columns]
+            
+            if len(metricas_encontradas) == len(metricas_esperadas):
+                st.success(f"✅ Todas las métricas de calificaciones fueron calculadas ({len(metricas_encontradas)}/7)")
+                
+                # Mostrar estadísticas de las métricas
+                if 'Promedio_Ciclo' in data_limpia.columns:
+                    promedios = data_limpia['Promedio_Ciclo'].dropna()
+                    if len(promedios) > 0:
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Promedio general", f"{promedios.mean():.2f}")
+                        with col2:
+                            st.metric("Promedio mínimo", f"{promedios.min():.2f}")
+                        with col3:
+                            st.metric("Promedio máximo", f"{promedios.max():.2f}")
+            else:
+                st.warning(f"⚠️ Solo {len(metricas_encontradas)}/7 métricas encontradas")
+                st.write(f"   Faltantes: {set(metricas_esperadas) - set(metricas_encontradas)}")
+            
+            # 5. Verificar métricas adicionales
+            st.write("**5. ¿Se calcularon métricas adicionales?**")
+            metricas_adicionales = ['Num_Materias_Ciclo', 'Cant_Perdidas', 'Materias_Vistas']
+            metricas_adic_encontradas = [m for m in metricas_adicionales if m in data_limpia.columns]
+            
+            if len(metricas_adic_encontradas) == len(metricas_adicionales):
+                st.success(f"✅ Todas las métricas adicionales fueron calculadas ({len(metricas_adic_encontradas)}/3)")
+            else:
+                st.warning(f"⚠️ Solo {len(metricas_adic_encontradas)}/3 métricas adicionales encontradas")
+            
+            # 6. Verificar columnas con sufijos
+            st.write("**6. ¿Existen columnas con sufijos?**")
             sufijos = ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas']
             cols_sufijos = [c for c in data_limpia.columns if any(c.endswith(s) for s in sufijos)]
             
@@ -195,9 +262,9 @@ def seccion_limpieza():
             else:
                 st.success("✅ No hay columnas con sufijos duplicados")
             
-            # 4. Verificar valores nulos críticos
-            st.write("**4. Valores nulos en columnas críticas:**")
-            cols_criticas = ['ID', 'Mult Programa', 'Programa', 'Ciclo', 'Siglas Prog']
+            # 7. Verificar valores nulos críticos
+            st.write("**7. Valores nulos en columnas críticas:**")
+            cols_criticas = ['ID', 'Mult Programa', 'Programa_Academico_Base', 'Ciclo', 'Siglas Prog', 'Dropout']
             cols_criticas = [c for c in cols_criticas if c in data_limpia.columns]
             
             nulos_criticos = data_limpia[cols_criticas].isnull().sum()
@@ -245,11 +312,11 @@ def seccion_limpieza():
 
 if __name__ == "__main__":
     st.set_page_config(
-        page_title="Limpieza de Datos",
+        page_title="Limpieza Completa de Datos",
         page_icon="🧹",
         layout="wide"
     )
     
-    st.title("🧹 Procesador de Limpieza - Pasos 1-13")
+    st.title("🧹 Procesador de Limpieza COMPLETO - 10 Fases")
     
     seccion_limpieza()
