@@ -478,7 +478,7 @@ class DataProcessorXGBoost:
     
     def predecir(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Realiza predicciones con el modelo XGBoost
+        Realiza predicciones con el modelo XGBoost (potencialmente envuelto en ExponentiatedGradient)
         
         Args:
             data: DataFrame procesado por el pipeline
@@ -488,6 +488,7 @@ class DataProcessorXGBoost:
         """
         print("\n🎯 INICIANDO PREDICCIÓN...")
         print(f"   Estado del modelo: {'✅ Cargado' if self.modelo is not None else '❌ NO cargado'}")
+        print(f"   Tipo de modelo: {type(self.modelo).__name__}")
         print(f"   Registros a predecir: {len(data)}")
         
         if self.modelo is None:
@@ -497,7 +498,7 @@ class DataProcessorXGBoost:
                 "   Revisa los logs para ver si hubo errores en la descarga o carga."
             )
         
-        print("🎯 Realizando predicciones con XGBoost...")
+        print("🎯 Realizando predicciones...")
         
         try:
             # Preparar datos para el modelo
@@ -517,8 +518,27 @@ class DataProcessorXGBoost:
             else:
                 X_scaled = X
             
-            # Predecir probabilidades
-            probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
+            # Detectar si es ExponentiatedGradient o modelo normal
+            modelo_tipo = type(self.modelo).__name__
+            
+            if 'ExponentiatedGradient' in modelo_tipo or 'GridSearch' in modelo_tipo:
+                print("   ℹ️ Detectado modelo con mitigación (ExponentiatedGradient)")
+                
+                # ExponentiatedGradient solo tiene predict(), no predict_proba()
+                # Usar el método predict() que devuelve 0 o 1
+                predicciones = self.modelo.predict(X_scaled)
+                
+                # Convertir a probabilidades (0 o 1)
+                # Como no tenemos probabilidades reales, usamos las predicciones directas
+                # Asignamos probabilidades artificiales: 0.1 para clase 0, 0.9 para clase 1
+                probabilidades = np.where(predicciones == 1, 0.9, 0.1)
+                
+                print("   ⚠️ Usando predicciones binarias (0/1) convertidas a probabilidades aproximadas")
+                
+            else:
+                print("   ℹ️ Detectado modelo estándar con predict_proba()")
+                # Modelo normal con predict_proba
+                probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
             
             # Agregar resultados al DataFrame
             resultado = data.copy()
