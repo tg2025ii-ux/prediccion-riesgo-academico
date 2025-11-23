@@ -428,10 +428,12 @@ class DataProcessorXGBoost:
         return data_final
     
     def _limpieza_final(self, data):
-        """Limpia columnas duplicadas y renombra"""
+        """Limpia columnas duplicadas y renombra, eliminando columnas no numéricas"""
         
-        # Resolver columnas duplicadas
-        # Preferir _per > _prom > _adm
+        print("    🧹 Iniciando limpieza final...")
+        print(f"       Columnas antes: {len(data.columns)}")
+        
+        # PASO 1: Resolver columnas duplicadas (preferir _per > _prom > _adm)
         for col_base in ['Créditos Inscritos y Aprobados Ciclo', 'Ciudad (Dirección)', 
                          'Sexo', 'Colegio', 'F Nacimiento', 'Dpto Nacimiento', 'País Nacimiento']:
             
@@ -443,36 +445,124 @@ class DataProcessorXGBoost:
             # Si existe versión _per, usarla y eliminar las demás
             if col_per in data.columns:
                 if col_prom in data.columns:
-                    data.drop(columns=[col_prom], inplace=True)
+                    data.drop(columns=[col_prom], inplace=True, errors='ignore')
                 if col_adm in data.columns:
-                    data.drop(columns=[col_adm], inplace=True)
+                    data.drop(columns=[col_adm], inplace=True, errors='ignore')
                 if col_ppn in data.columns:
-                    data.drop(columns=[col_ppn], inplace=True)
+                    data.drop(columns=[col_ppn], inplace=True, errors='ignore')
                 
                 # Renombrar _per al nombre base
                 data.rename(columns={col_per: col_base}, inplace=True)
         
-        # Eliminar Ciclo Admisión duplicados
-        if 'Ciclo Admisión_per' in data.columns:
-            data.drop(columns=['Ciclo Admisión_per'], inplace=True, errors='ignore')
-        if 'Ciclo Admisión_prom' in data.columns:
-            data.drop(columns=['Ciclo Admisión_prom'], inplace=True, errors='ignore')
-        
-        # Resolver Estado, Acción, Motivo (preferir _per)
+        # PASO 2: Resolver Estado, Acción, Motivo (preferir _per)
         for col in ['Estado', 'Acción', 'Motivo']:
             if f"{col}_per" in data.columns:
                 data.drop(columns=[f"{col}_prom", f"{col}_ppn"], inplace=True, errors='ignore')
                 data.rename(columns={f"{col}_per": col}, inplace=True)
         
-        # Eliminar columnas innecesarias
+        # PASO 3: Eliminar columnas específicas innecesarias
         cols_eliminar = [
-            'Fecha Grado', 'Estado_adm', 'Situacion Acad', 'ID Colegio',
-            'Créd Inscritos xa PromedioCicl', 'Créd.Inscrtos Aprbdos PromCicl',
-            'Num_Materias_Ciclo'
+            # Columnas de identificación personal
+            'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última', 
+            '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
+            
+            # Documentos
+            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm', 
+            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad',
+            
+            # Contacto
+            'Dirección', 'Dirección 1', 'Dirección 2', 
+            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
+            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
+            'Celular Inscripción',
+            
+            # Fechas
+            'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm',
+            'Fecha Grado',
+            
+            # Ubicación (texto)
+            'Ciudad (Dirección)', 'Ciudad (Dirección)_ppn', 'Ciudad (Dirección)_adm',
+            'Estado (Dirección)', 'País (Dirección)',
+            'Ciudad Nacimiento', 'Lugar Nacimiento',
+            'Dpto Nacimiento', 'Dpto Nacimiento_ppn', 'Dpto Nacimiento_adm',
+            'País Nacimiento', 'País Nacimiento_ppn', 'País Nacimiento_adm',
+            
+            # Otras columnas de texto
+            'Colegio', 'Colegio_ppn', 'Colegio_adm', 'ID Colegio',
+            'Descripción', 'Org Acad', 'Tipo',
+            
+            # Estado/Acción/Motivo duplicados
+            'Estado_adm', 'Estado Clase',
+            
+            # Programa duplicados (mantener solo el procesado)
+            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
+            
+            # Ciclo Admisión duplicados
+            'Ciclo Admisión_per', 'Ciclo Admisión_prom',
+            
+            # Otras
+            'Situacion Acad', 'Créd Inscritos xa PromedioCicl', 
+            'Créd.Inscrtos Aprbdos PromCicl', 'Num_Materias_Ciclo',
+            
+            # Año (puede ser texto)
+            'Año', 'Año_per', 'Año_prom'
         ]
-        data.drop(columns=[c for c in cols_eliminar if c in data.columns], inplace=True, errors='ignore')
         
-        print("    ✓ Limpieza de columnas completada")
+        data.drop(columns=[c for c in cols_eliminar if c in data.columns], 
+                 inplace=True, errors='ignore')
+        
+        # PASO 4: Eliminar TODAS las columnas con sufijos duplicados que queden
+        columnas_a_eliminar = []
+        for col in data.columns:
+            if any(col.endswith(suffix) for suffix in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas']):
+                columnas_a_eliminar.append(col)
+        
+        if columnas_a_eliminar:
+            print(f"       → Eliminando columnas duplicadas: {len(columnas_a_eliminar)}")
+            data.drop(columns=columnas_a_eliminar, inplace=True, errors='ignore')
+        
+        # PASO 5: Convertir columnas de texto restantes a dummies
+        # Identificar columnas tipo object (texto) que no sean numéricas
+        columnas_texto = data.select_dtypes(include=['object']).columns.tolist()
+        
+        if columnas_texto:
+            print(f"       → Columnas de texto encontradas: {columnas_texto}")
+            
+            # Convertir a dummies solo si tiene pocos valores únicos (categóricas)
+            for col in columnas_texto:
+                n_unique = data[col].nunique()
+                
+                if n_unique <= 50:  # Solo categorizar si tiene menos de 50 valores únicos
+                    print(f"          Convirtiendo '{col}' a dummies ({n_unique} valores)")
+                    dummies = pd.get_dummies(data[col], prefix=col, drop_first=True)
+                    data = pd.concat([data, dummies], axis=1)
+                    data.drop(columns=[col], inplace=True)
+                else:
+                    print(f"          Eliminando '{col}' (demasiados valores: {n_unique})")
+                    data.drop(columns=[col], inplace=True)
+        
+        # PASO 6: Convertir columnas de fecha a número (días desde una fecha base)
+        columnas_fecha = data.select_dtypes(include=['datetime64']).columns.tolist()
+        
+        if columnas_fecha:
+            print(f"       → Convirtiendo fechas a días: {columnas_fecha}")
+            for col in columnas_fecha:
+                # Convertir a días desde 1970-01-01
+                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
+        
+        # PASO 7: Asegurar que TODAS las columnas sean numéricas
+        for col in data.columns:
+            if data[col].dtype == 'object':
+                print(f"       ⚠️  Columna '{col}' sigue siendo texto, intentando convertir...")
+                try:
+                    data[col] = pd.to_numeric(data[col], errors='coerce')
+                    data[col].fillna(0, inplace=True)
+                except:
+                    print(f"       ❌ No se pudo convertir '{col}', eliminando...")
+                    data.drop(columns=[col], inplace=True)
+        
+        print(f"       ✓ Columnas después: {len(data.columns)}")
+        print(f"       ✓ Tipos de datos: {data.dtypes.value_counts().to_dict()}")
         
         return data
     
