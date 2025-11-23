@@ -527,50 +527,40 @@ class DataProcessorAjustes:
         return data
     
     # ============================================================================
-# FASE 11: APLICAR COLUMNAS DEL MODELO
-# ============================================================================
-
-def _aplicar_columnas_modelo(self, data):
-    """Aplicar orden y selección de columnas del modelo"""
-    print("\n📋 Aplicando columnas del modelo...")
+    # FASE 11: APLICAR COLUMNAS DEL MODELO
+    # ============================================================================
     
-    if not self.columnas_modelo:
-        print("   ⚠️ Columnas del modelo no cargadas")
+    def _aplicar_columnas_modelo(self, data):
+        """Aplicar orden y selección de columnas del modelo"""
+        print("\n📋 Aplicando columnas del modelo...")
+        
+        if not self.columnas_modelo:
+            print("   ⚠️ Columnas del modelo no cargadas")
+            return data
+        
+        # Eliminar 'desercion' de columnas_modelo si existe
+        data = data.drop(columns=['desercion'], errors='ignore')
+        
+        # Renombrar usando Libro1.xlsx Hoja3 si está disponible
+        # (esto se hizo en el código original pero no tenemos el mapeo aquí)
+        
+        # Columnas existentes
+        cols_existentes = [col for col in self.columnas_modelo if col in data.columns]
+        
+        # Columnas con "_" que no existen → crear con 0
+        cols_a_crear = [col for col in self.columnas_modelo if "_" in col and col not in data.columns]
+        
+        for col in cols_a_crear:
+            data[col] = 0
+        
+        # Ordenar según columnas_modelo
+        data = data[cols_existentes + cols_a_crear]
+        
+        print(f"   ✓ Columnas aplicadas: {len(data.columns)} columnas")
+        print(f"      - Existentes: {len(cols_existentes)}")
+        print(f"      - Creadas (con 0): {len(cols_a_crear)}")
+        
         return data
-    
-    # Eliminar 'desercion' de columnas_modelo si existe
-    data = data.drop(columns=['desercion'], errors='ignore')
-    
-    # CORRECCIÓN: Eliminar duplicados de columnas_modelo manteniendo el orden
-    columnas_modelo_unicas = []
-    seen = set()
-    for col in self.columnas_modelo:
-        if col not in seen:
-            columnas_modelo_unicas.append(col)
-            seen.add(col)
-    
-    if len(columnas_modelo_unicas) < len(self.columnas_modelo):
-        duplicados = len(self.columnas_modelo) - len(columnas_modelo_unicas)
-        print(f"   ⚠️ Se encontraron {duplicados} columnas duplicadas en columnas_modelo")
-        print(f"   ✓ Usando {len(columnas_modelo_unicas)} columnas únicas")
-    
-    # Columnas existentes
-    cols_existentes = [col for col in columnas_modelo_unicas if col in data.columns]
-    
-    # Columnas con "_" que no existen → crear con 0
-    cols_a_crear = [col for col in columnas_modelo_unicas if "_" in col and col not in data.columns]
-    
-    for col in cols_a_crear:
-        data[col] = 0
-    
-    # Ordenar según columnas_modelo (ahora sin duplicados)
-    data = data[cols_existentes + cols_a_crear]
-    
-    print(f"   ✓ Columnas aplicadas: {len(data.columns)} columnas")
-    print(f"      - Existentes: {len(cols_existentes)}")
-    print(f"      - Creadas (con 0): {len(cols_a_crear)}")
-    
-    return data
 
 
 # =============================================================================
