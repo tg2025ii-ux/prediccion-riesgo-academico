@@ -342,14 +342,13 @@ class DataProcessorLimpiezaCompleto:
         print("\n🗑️ Eliminando ciclos máximos...")
         
         ciclo_max_per = per["Ciclo"].max()
-        ciclo_max_prom = prom["Ciclo"].max()
         ciclo_max_adm = adm["Ciclo"].max()
-        ciclo_max_notas = notas["Ciclo"].max()
+
         
         per = per[per["Ciclo"] != ciclo_max_per].copy()
-        prom = prom[prom["Ciclo"] != ciclo_max_prom].copy()
+        prom = prom[prom["Ciclo"] != ciclo_max_per].copy()
         adm = adm[adm["Ciclo"] != ciclo_max_adm].copy()
-        notas = notas[notas["Ciclo"] != ciclo_max_notas].copy()
+        notas = notas[notas["Ciclo"] != ciclo_max_per].copy()
         
         print(f"   ✓ Eliminado ciclo max: PER={ciclo_max_per}, PROM={ciclo_max_prom}, ADM={ciclo_max_adm}, NOTAS={ciclo_max_notas}")
         
