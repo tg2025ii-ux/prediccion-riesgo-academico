@@ -350,7 +350,7 @@ class DataProcessorLimpiezaCompleto:
         adm = adm[adm["Ciclo"] != ciclo_max_adm].copy()
         notas = notas[notas["Ciclo"] != ciclo_max_per].copy()
         
-        print(f"   ✓ Eliminado ciclo max: PER={ciclo_max_per}, PROM={ciclo_max_prom}, ADM={ciclo_max_adm}, NOTAS={ciclo_max_notas}")
+        print(f"   ✓ Eliminado ciclo max: PER={ciclo_max_per}, ADM={ciclo_max_adm}")
         
         return notas, per, prom, adm
     
