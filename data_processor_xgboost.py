@@ -183,6 +183,7 @@ class DataProcessorXGBoost:
     def _procesar_notas(self, notas):
         """Procesa la base NOTAS"""
         print("  📋 Procesando NOTAS...")
+        print(f"    📌 Columnas ANTES del rename: {list(notas.columns)}")
         
         # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
         rename_dict = {
@@ -192,6 +193,7 @@ class DataProcessorXGBoost:
             'Estado.1': 'Estado Clase'
         }
         notas.rename(columns=rename_dict, inplace=True)
+        print(f"    📌 Columnas DESPUÉS del rename: {list(notas.columns)}")
         
         # PASO 2: Eliminar columnas innecesarias
         cols_drop = ['Nombre', 'Nº Oferta', 'Nº Clase', 'Sesión', 'Sección', 'Motivo']
@@ -213,6 +215,7 @@ class DataProcessorXGBoost:
     def _procesar_per(self, per):
         """Procesa la base PER"""
         print("  👤 Procesando PER...")
+        print(f"    📌 Columnas ANTES del rename: {list(per.columns)}")
         
         # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
         rename_dict = {
@@ -225,6 +228,7 @@ class DataProcessorXGBoost:
             'Motivo Acción': 'Motivo'
         }
         per.rename(columns=rename_dict, inplace=True)
+        print(f"    📌 Columnas DESPUÉS del rename: {list(per.columns)}")
         
         per_original = per.copy()  # Guardar copia original
         print(f"    ✓ PER procesada: {len(per)} registros")
@@ -233,6 +237,7 @@ class DataProcessorXGBoost:
     def _procesar_prom(self, prom):
         """Procesa la base PROM"""
         print("  📈 Procesando PROM...")
+        print(f"    📌 Columnas ANTES del rename: {list(prom.columns)}")
         
         # PASO 1: RENOMBRAR COLUMNAS (del Pipeline__2_)
         rename_dict = {
@@ -244,6 +249,7 @@ class DataProcessorXGBoost:
             'Motivo Accion': 'Motivo'
         }
         prom.rename(columns=rename_dict, inplace=True)
+        print(f"    📌 Columnas DESPUÉS del rename: {list(prom.columns)}")
         
         print(f"    ✓ PROM procesada: {len(prom)} registros")
         return prom
