@@ -659,11 +659,23 @@ class DataProcessorXGBoost:
             else:
                 X = data
             
+            print(f"   📊 Shape de X: {X.shape}")
+            print(f"   📊 Tipo de X: {type(X)}")
+            
             # Estandarizar si existe scaler
             if self.scaler is not None:
+                print("   🔧 Aplicando scaler...")
                 X_scaled = self.scaler.transform(X)
+                
+                # IMPORTANTE: Convertir de numpy array a DataFrame
+                # XGBoost necesita un DataFrame de Pandas con nombres de columnas
+                X_scaled = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
+                print(f"   ✓ Datos estandarizados y convertidos a DataFrame")
             else:
                 X_scaled = X
+            
+            print(f"   📊 Shape de X_scaled: {X_scaled.shape}")
+            print(f"   📊 Tipo de X_scaled: {type(X_scaled)}")
             
             # Detectar si es ExponentiatedGradient o modelo normal
             modelo_tipo = type(self.modelo).__name__
