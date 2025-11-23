@@ -138,7 +138,7 @@ st.markdown(f"""
 # Inicializar el procesador
 @st.cache_resource
 def get_processor():
-    return DataProcessor()
+    return DataProcessorXGBoost()  
 
 processor = get_processor()
 
