@@ -140,7 +140,7 @@ st.markdown(f"""
 def get_processor():
     return DataProcessorXGBoost()  
 
-processor = get_processor()
+processor = DataProcessorXGBoost()
 
 # Sidebar
 with st.sidebar:
