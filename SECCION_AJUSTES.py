@@ -258,36 +258,7 @@ def seccion_ajustes():
         # Tabs para explorar
         tab1, tab2, tab3, tab4 = st.tabs(["👁️ Vista Previa", "📋 Columnas", "📊 Estadísticas", "⚠️ Verificaciones"])
 
-        # Diagnosticar columnas duplicadas
-duplicadas = data_final.columns[data_final.columns.duplicated()].tolist()
-if duplicadas:
-    st.error(f"❌ Se encontraron {len(duplicadas)} columnas duplicadas:")
-    st.write(duplicadas)
-    
-    # Contar duplicados
-    from collections import Counter
-    duplicados_count = Counter([col for col in data_final.columns 
-                                if list(data_final.columns).count(col) > 1])
-    st.write("**Frecuencia de duplicados:**")
-    for col, count in duplicados_count.items():
-        st.write(f"- `{col}`: aparece {count} veces")
-    
-    # Eliminar duplicados antes de mostrar
-    data_final = data_final.loc[:, ~data_final.columns.duplicated(keep='first')]
-    st.success("✅ Columnas duplicadas eliminadas para visualización")
-
-st.dataframe(
-    data_final.head(100),
-    use_container_width=True,
-    height=400
-)        
-        with tab1:
-            st.write("**Primeras 100 filas:**")
-            st.dataframe(
-                data_final.head(100),
-                use_container_width=True,
-                height=400
-            )
+        # Diagnosticar columnas duplicada
         
         with tab2:
             st.write("### Lista de Columnas")
