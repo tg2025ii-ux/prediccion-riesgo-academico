@@ -56,23 +56,26 @@ class DataProcessorLimpieza:
             DataFrame limpio
         """
         print("\n" + "="*80)
-        print("🔄 INICIANDO LIMPIEZA - 13 PASOS")
+        print("🔄 INICIANDO PROCESAMIENTO COMPLETO")
         print("="*80)
         
+        # PASO 0: Consolidación inicial (crear estructura base con Dropout)
+        notas_consolidada = self._paso_0_consolidacion_inicial(notas)
+        
         # PASO 1-4: Renombres
-        notas, per, prom, adm = self._paso_1_4_renombres(notas, per, prom, adm)
+        notas_consolidada, per, prom, adm = self._paso_1_4_renombres(notas_consolidada, per, prom, adm)
         
         # PASO 5: Eliminar IDs fallecidos
-        notas, per, prom, adm = self._paso_5_eliminar_fallecidos(notas, per, prom, adm)
+        notas_consolidada, per, prom, adm = self._paso_5_eliminar_fallecidos(notas_consolidada, per, prom, adm)
         
         # PASO 6: Filtrar ciclos y créditos
-        notas, per, prom, adm = self._paso_6_filtrar_ciclos(notas, per, prom, adm)
+        notas_consolidada, per, prom, adm = self._paso_6_filtrar_ciclos(notas_consolidada, per, prom, adm)
         
         # PASO 7: Transformar Mult Programa
-        notas, per, prom = self._paso_7_transformar_mult_programa(notas, per, prom)
+        notas_consolidada, per, prom = self._paso_7_transformar_mult_programa(notas_consolidada, per, prom)
         
         # PASO 8: Merge PER + PROM + NOTAS
-        per_prom_notas = self._paso_8_merge_per_prom_notas(per, prom, notas)
+        per_prom_notas = self._paso_8_merge_per_prom_notas(per, prom, notas_consolidada)
         
         # PASO 9: Merge con ADM
         data_fusionada = self._paso_9_merge_adm(per_prom_notas, adm)
@@ -90,14 +93,102 @@ class DataProcessorLimpieza:
         data_final = self._paso_13_rellenar_dpto_pais(data_final)
         
         print("\n" + "="*80)
-        print(f"✅ LIMPIEZA COMPLETADA")
+        print(f"✅ PROCESAMIENTO COMPLETADO")
         print(f"   • Registros finales: {len(data_final)}")
         print(f"   • Columnas finales: {len(data_final.columns)}")
         print("="*80)
         
         return data_final
     
-    def _paso_1_4_renombres(self, notas, per, prom, adm):
+    def _paso_0_consolidacion_inicial(self, notas):
+        """
+        PASO 0: Consolidación inicial - Crear estructura base con Dropout
+        Replica crear_base_consolidada_paso1_simple del pipeline original
+        """
+        print("\n🏗️ PASO 0: CONSOLIDACIÓN INICIAL (estructura base + Dropout)")
+        print("="*80)
+        
+        # Estados que indican deserción
+        estados_desercion = ["Suspendido", "Permiso", "Interrumpido", "Expulsado", "Cancelado"]
+        
+        print("📊 Información de NOTAS original:")
+        print(f"   • Total registros: {len(notas):,}")
+        print(f"   • Columnas: {list(notas.columns)[:10]}...")
+        
+        # Determinar nombres de columnas (pueden variar)
+        col_id = 'ID'
+        col_ciclo = 'Ciclo'
+        
+        # Buscar columna de Grado
+        col_grado = None
+        for possible in ['Grado Académico', 'Grado_Academico', 'Grado']:
+            if possible in notas.columns:
+                col_grado = possible
+                break
+        
+        # Buscar columna de Programa
+        col_programa = None
+        for possible in ['Programa Académico Base', 'Programa_Academico_Base', 'Programa']:
+            if possible in notas.columns:
+                col_programa = possible
+                break
+        
+        # Buscar columna de Estado
+        col_estado = None
+        for possible in ['Estado', 'Estado.1', 'Estado Clase']:
+            if possible in notas.columns:
+                col_estado = possible
+                break
+        
+        if not all([col_grado, col_programa, col_estado]):
+            raise ValueError(f"❌ No se encontraron columnas necesarias. Disponibles: {list(notas.columns)}")
+        
+        print(f"   ✓ Usando columnas:")
+        print(f"      - ID: {col_id}")
+        print(f"      - Grado: {col_grado}")
+        print(f"      - Programa: {col_programa}")
+        print(f"      - Ciclo: {col_ciclo}")
+        print(f"      - Estado: {col_estado}")
+        
+        # Obtener combinaciones únicas
+        columnas_agrupacion = [col_id, col_grado, col_ciclo]
+        
+        df_unico = notas[columnas_agrupacion + [col_programa, col_estado]].drop_duplicates()
+        
+        print(f"\n⚡ Creando agrupación base...")
+        
+        # Agrupar y obtener valores más frecuentes
+        agrupacion_base = df_unico.groupby(columnas_agrupacion).agg({
+            col_programa: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0],
+            col_estado: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]
+        }).reset_index()
+        
+        # Renombrar columnas estandarizadas
+        rename_dict = {
+            col_id: 'ID',
+            col_grado: 'Grado_Academico',
+            col_ciclo: 'Ciclo',
+            col_programa: 'Programa_Academico_Base',
+            col_estado: 'Estado'
+        }
+        agrupacion_base = agrupacion_base.rename(columns=rename_dict)
+        
+        # Calcular variable Dropout
+        print(f"   🎯 Calculando variable Dropout...")
+        agrupacion_base['Dropout'] = agrupacion_base['Estado'].apply(
+            lambda estado: 1 if estado in estados_desercion else 0
+        )
+        
+        # Estadísticas
+        dropout_count = agrupacion_base['Dropout'].value_counts()
+        print(f"\n   ✓ Consolidación completada:")
+        print(f"      • Registros consolidados: {len(agrupacion_base):,}")
+        print(f"      • Sin deserción (0): {dropout_count.get(0, 0):,}")
+        print(f"      • En deserción (1): {dropout_count.get(1, 0):,}")
+        
+        return agrupacion_base
+    
+    def _paso_1_4_renombres(self, notas_consolidada, per, prom, adm):
         """PASO 1-4: Renombrar columnas en las 4 bases"""
         print("\n📝 PASO 1-4: Renombrando columnas...")
         
@@ -134,14 +225,22 @@ class DataProcessorLimpieza:
             'Motivo Acción': 'Motivo'
         })
         
-        # PASO 4: NOTAS
-        notas = notas.rename(columns={
-            'Grado_Academico': 'Mult Programa',
-            'Programa Académico Base': 'Programa'
-        })
+        # PASO 4: NOTAS CONSOLIDADA
+        # Ya viene con nombres estandarizados del PASO 0, solo necesitamos renombrar a los finales
+        print(f"   📋 Columnas en NOTAS consolidada: {list(notas_consolidada.columns)}")
         
+        rename_dict = {
+            'Grado_Academico': 'Mult Programa',
+            'Programa_Academico_Base': 'Programa'
+        }
+        
+        notas_consolidada = notas_consolidada.rename(columns=rename_dict)
+        
+        print(f"   ✓ NOTAS consolidada renombrada")
+        print(f"   ✓ Columnas después: {list(notas_consolidada.columns)}")
         print("   ✓ Renombres completados")
-        return notas, per, prom, adm
+        
+        return notas_consolidada, per, prom, adm
     
     def _paso_5_eliminar_fallecidos(self, notas, per, prom, adm):
         """PASO 5: Eliminar IDs fallecidos"""
@@ -241,18 +340,50 @@ class DataProcessorLimpieza:
         """PASO 8: Merge PER + PROM + NOTAS"""
         print("\n🔗 PASO 8: Merge PER + PROM + NOTAS...")
         
+        # DEBUG: Mostrar columnas disponibles
+        print(f"   📋 Columnas en NOTAS: {list(notas.columns)}")
+        print(f"   📋 Columnas en PER: {list(per.columns)[:10]}...")
+        print(f"   📋 Columnas en PROM: {list(prom.columns)[:10]}...")
+        
         # 1. Merge PER + PROM
+        # Verificar columnas requeridas
+        cols_merge = ['ID', 'Mult Programa', 'Programa', 'Ciclo']
+        
+        # Verificar que todas las columnas existan
+        for col in cols_merge:
+            if col not in per.columns:
+                raise ValueError(f"❌ Columna '{col}' no existe en PER. Columnas disponibles: {list(per.columns)}")
+            if col not in prom.columns:
+                raise ValueError(f"❌ Columna '{col}' no existe en PROM. Columnas disponibles: {list(prom.columns)}")
+        
         per_prom_unido = per.merge(
             prom,
-            on=['ID', 'Mult Programa', 'Programa', 'Ciclo'],
+            on=cols_merge,
             how='inner',
             suffixes=('_per', '_prom')
         )
         print(f"   → PER + PROM = {len(per_prom_unido)} registros")
         
         # 2. Crear columnas auxiliares para match (primeras 2 letras)
+        # En PER+PROM usar 'Prog Acad'
+        if 'Prog Acad' not in per_prom_unido.columns:
+            raise ValueError(f"❌ 'Prog Acad' no existe en PER+PROM. Columnas: {list(per_prom_unido.columns)}")
+        
         per_prom_unido['Prog_Acad_2'] = per_prom_unido['Prog Acad'].str[:2]
-        notas['Programa_2'] = notas['Programa'].str[:2]
+        
+        # En NOTAS buscar la columna de programa
+        # Puede ser 'Programa' o 'Programa Académico Base' dependiendo del rename
+        col_programa_notas = None
+        for possible_col in ['Programa', 'Programa Académico Base', 'Programa_Academico_Base']:
+            if possible_col in notas.columns:
+                col_programa_notas = possible_col
+                break
+        
+        if col_programa_notas is None:
+            raise ValueError(f"❌ No se encontró columna de Programa en NOTAS. Columnas disponibles: {list(notas.columns)}")
+        
+        print(f"   → Usando '{col_programa_notas}' de NOTAS")
+        notas['Programa_2'] = notas[col_programa_notas].str[:2]
         
         # 3. Merge (PER+PROM) + NOTAS
         per_prom_notas = pd.merge(
@@ -267,10 +398,13 @@ class DataProcessorLimpieza:
         # 4. Eliminar columnas auxiliares
         per_prom_notas = per_prom_notas.drop(columns=['Prog_Acad_2', 'Programa_2'])
         
-        # 5. Renombrar Programa de NOTAS
-        per_prom_notas = per_prom_notas.rename(columns={
-            'Programa_y': 'Programa Notas'
-        })
+        # 5. Renombrar Programa de NOTAS si es necesario
+        # Buscar columna que termine en _y (resultado del merge)
+        for col in per_prom_notas.columns:
+            if col.endswith('_y') and 'Programa' in col:
+                per_prom_notas = per_prom_notas.rename(columns={col: 'Programa Notas'})
+                print(f"   → Renombrado '{col}' a 'Programa Notas'")
+                break
         
         print("   ✓ Merge PER+PROM+NOTAS completado")
         return per_prom_notas
