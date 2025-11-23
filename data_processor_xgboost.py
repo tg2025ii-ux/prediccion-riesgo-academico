@@ -655,27 +655,37 @@ class DataProcessorXGBoost:
                     if col not in data.columns:
                         data[col] = 0  # Agregar columnas faltantes con 0
                 
-                X = data[self.columnas_modelo]
+                X = data[self.columnas_modelo].copy()
             else:
-                X = data
+                X = data.copy()
             
             print(f"   📊 Shape de X: {X.shape}")
-            print(f"   📊 Tipo de X: {type(X)}")
+            print(f"   📊 Columnas en X: {len(X.columns)}")
+            
+            # CRÍTICO: Convertir TODO a valores numéricos y eliminar duplicados
+            # Verificar que no haya columnas duplicadas
+            if X.columns.duplicated().any():
+                print("   ⚠️ Columnas duplicadas detectadas, eliminando...")
+                X = X.loc[:, ~X.columns.duplicated()]
+            
+            # Asegurar que todas las columnas sean numéricas
+            for col in X.columns:
+                if X[col].dtype == 'object':
+                    print(f"   ⚠️ Columna '{col}' es texto, convirtiendo...")
+                    X[col] = pd.to_numeric(X[col], errors='coerce').fillna(0)
             
             # Estandarizar si existe scaler
             if self.scaler is not None:
                 print("   🔧 Aplicando scaler...")
                 X_scaled = self.scaler.transform(X)
-                
-                # IMPORTANTE: Convertir de numpy array a DataFrame
-                # XGBoost necesita un DataFrame de Pandas con nombres de columnas
-                X_scaled = pd.DataFrame(X_scaled, columns=X.columns, index=X.index)
-                print(f"   ✓ Datos estandarizados y convertidos a DataFrame")
+                print(f"   ✓ Datos estandarizados (numpy array: {X_scaled.shape})")
             else:
-                X_scaled = X
+                # Convertir a numpy array directamente
+                X_scaled = X.values
+                print(f"   ✓ Convertido a numpy array: {X_scaled.shape}")
             
-            print(f"   📊 Shape de X_scaled: {X_scaled.shape}")
-            print(f"   📊 Tipo de X_scaled: {type(X_scaled)}")
+            # SOLUCIÓN: Usar numpy array directamente, NO DataFrame
+            # Esto evita el problema de compatibilidad de versiones
             
             # Detectar si es ExponentiatedGradient o modelo normal
             modelo_tipo = type(self.modelo).__name__
@@ -683,20 +693,16 @@ class DataProcessorXGBoost:
             if 'ExponentiatedGradient' in modelo_tipo or 'GridSearch' in modelo_tipo:
                 print("   ℹ️ Detectado modelo con mitigación (ExponentiatedGradient)")
                 
-                # ExponentiatedGradient solo tiene predict(), no predict_proba()
-                # Usar el método predict() que devuelve 0 o 1
+                # IMPORTANTE: Pasar como numpy array
                 predicciones = self.modelo.predict(X_scaled)
                 
-                # Convertir a probabilidades (0 o 1)
-                # Como no tenemos probabilidades reales, usamos las predicciones directas
-                # Asignamos probabilidades artificiales: 0.1 para clase 0, 0.9 para clase 1
+                # Convertir a probabilidades
                 probabilidades = np.where(predicciones == 1, 0.9, 0.1)
                 
                 print("   ⚠️ Usando predicciones binarias (0/1) convertidas a probabilidades aproximadas")
                 
             else:
                 print("   ℹ️ Detectado modelo estándar con predict_proba()")
-                # Modelo normal con predict_proba
                 probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
             
             # Agregar resultados al DataFrame
