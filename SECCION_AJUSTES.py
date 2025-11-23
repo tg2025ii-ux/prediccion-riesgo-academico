@@ -261,7 +261,7 @@ def seccion_ajustes():
         with tab1:
             st.write("**Primeras 100 filas:**")
             st.dataframe(
-                data_final.head(50),
+                data_final.head(100),
                 use_container_width=True,
                 height=400
             )
