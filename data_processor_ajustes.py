@@ -149,6 +149,13 @@ class DataProcessorAjustes:
         
         data = self._aplicar_columnas_modelo(data)
         
+        # ========== FASE 12: ELIMINAR DUPLICADOS ==========
+        print("\n" + "="*80)
+        print("FASE 12: ELIMINAR COLUMNAS DUPLICADAS")
+        print("="*80)
+        
+        data = self._eliminar_duplicados(data)
+        
         print("\n" + "="*80)
         print(f"✅ AJUSTES COMPLETADOS")
         print(f"   • Registros finales: {len(data)}")
@@ -559,6 +566,36 @@ class DataProcessorAjustes:
         print(f"   ✓ Columnas aplicadas: {len(data.columns)} columnas")
         print(f"      - Existentes: {len(cols_existentes)}")
         print(f"      - Creadas (con 0): {len(cols_a_crear)}")
+        
+        return data
+    
+    # ============================================================================
+    # FASE 12: ELIMINAR COLUMNAS DUPLICADAS
+    # ============================================================================
+    
+    def _eliminar_duplicados(self, data):
+        """Detectar y eliminar columnas duplicadas"""
+        print("\n🔍 Detectando columnas duplicadas...")
+        
+        # Verificar duplicados en nombres de columnas
+        columnas_originales = len(data.columns)
+        duplicados = data.columns[data.columns.duplicated()].tolist()
+        
+        if duplicados:
+            print(f"   ⚠️ Encontradas {len(duplicados)} columnas duplicadas:")
+            for dup in duplicados[:10]:  # Mostrar max 10
+                print(f"      - {dup}")
+            
+            # Eliminar duplicados (mantiene la primera ocurrencia)
+            data = data.loc[:, ~data.columns.duplicated()]
+            print(f"   ✓ Duplicados eliminados: {columnas_originales} → {len(data.columns)} columnas")
+        else:
+            print("   ✓ No hay columnas duplicadas")
+        
+        # Verificar valores únicos en nombres
+        columnas_unicas = len(set(data.columns))
+        if columnas_unicas != len(data.columns):
+            print(f"   ⚠️ Advertencia: {len(data.columns)} columnas pero solo {columnas_unicas} nombres únicos")
         
         return data
 
