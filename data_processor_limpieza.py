@@ -100,7 +100,350 @@ class DataProcessorLimpieza:
         
         return data_final
     
-    def _paso_0_consolidacion_inicial(self, notas):
+    def procesar_dataframes(self, notas: pd.DataFrame, per: pd.DataFrame, 
+                           prom: pd.DataFrame, adm: pd.DataFrame) -> pd.DataFrame:
+        """
+        Procesa los 4 DataFrames y retorna base limpia
+        
+        Args:
+            notas, per, prom, adm: DataFrames de las 4 bases
+            
+        Returns:
+            DataFrame limpio
+        """
+        print("\n" + "="*80)
+        print("🔄 INICIANDO PROCESAMIENTO COMPLETO")
+        print("="*80)
+        
+        # PASO -1: Limpieza inicial específica de NOTAS
+        notas = self._paso_menos1_limpieza_inicial_notas(notas)
+        
+        # PASO 0A: Consolidación inicial (crear estructura base con Dropout)
+        notas_consolidada = self._paso_0a_consolidacion_inicial(notas)
+        
+        # PASO 0B: Calcular métricas de calificaciones
+        notas_consolidada = self._paso_0b_metricas_calificaciones(notas, notas_consolidada)
+        
+        # PASO 0C: Agregar métricas adicionales
+        notas_consolidada = self._paso_0c_metricas_adicionales(notas, notas_consolidada)
+        
+        # PASO 1-4: Renombres
+        notas_consolidada, per, prom, adm = self._paso_1_4_renombres(notas_consolidada, per, prom, adm)
+        
+        # PASO 5: Eliminar IDs fallecidos
+        notas_consolidada, per, prom, adm = self._paso_5_eliminar_fallecidos(notas_consolidada, per, prom, adm)
+        
+        # PASO 6: Filtrar ciclos y créditos
+        notas_consolidada, per, prom, adm = self._paso_6_filtrar_ciclos(notas_consolidada, per, prom, adm)
+        
+        # PASO 7: Transformar Mult Programa
+        notas_consolidada, per, prom = self._paso_7_transformar_mult_programa(notas_consolidada, per, prom)
+        
+        # PASO 8: Merge PER + PROM + NOTAS
+        per_prom_notas = self._paso_8_merge_per_prom_notas(per, prom, notas_consolidada)
+        
+        # PASO 9: Merge con ADM
+        data_fusionada = self._paso_9_merge_adm(per_prom_notas, adm)
+        
+        # PASO 10: Resolver duplicados y eliminar Acción/Motivo
+        data_limpia = self._paso_10_resolver_duplicados(data_fusionada)
+        
+        # PASO 11: Calcular Siglas Prog (moda)
+        data_con_siglas = self._paso_11_calcular_siglas_prog(data_limpia)
+        
+        # PASO 12: Quitar penúltimo y crear Siglas Prog
+        data_final = self._paso_12_crear_siglas_prog(data_con_siglas)
+        
+        # PASO 13: Rellenar Dpto y País Nacimiento
+        data_final = self._paso_13_rellenar_dpto_pais(data_final)
+        
+        print("\n" + "="*80)
+        print(f"✅ PROCESAMIENTO COMPLETADO")
+        print(f"   • Registros finales: {len(data_final)}")
+        print(f"   • Columnas finales: {len(data_final.columns)}")
+        print("="*80)
+        
+        return data_final
+    
+    def _paso_menos1_limpieza_inicial_notas(self, notas):
+        """
+        PASO -1: Limpieza inicial específica de NOTAS
+        Antes de consolidar, se hacen estos cambios
+        """
+        print("\n🧹 PASO -1: Limpieza inicial de NOTAS")
+        print("="*80)
+        
+        # Renombrar Estado.1 a Estado Clase
+        if 'Estado.1' in notas.columns:
+            notas = notas.rename(columns={'Estado.1': 'Estado Clase'})
+            print("   ✓ 'Estado.1' renombrado a 'Estado Clase'")
+        
+        # Eliminar columnas innecesarias
+        cols_drop = ['Nombre', 'Nº Oferta', 'Nº Clase', 'Sesión', 'Sección', 'Motivo']
+        cols_drop_found = [c for c in cols_drop if c in notas.columns]
+        
+        if cols_drop_found:
+            notas = notas.drop(columns=cols_drop_found)
+            print(f"   ✓ Eliminadas {len(cols_drop_found)} columnas: {cols_drop_found}")
+        
+        print(f"   ✓ NOTAS después de limpieza: {len(notas)} registros, {len(notas.columns)} columnas")
+        
+        return notas
+    
+    def _paso_0a_consolidacion_inicial(self, notas):
+        """
+        PASO 0A: Consolidación inicial - Crear estructura base con Dropout
+        Replica crear_base_consolidada_paso1_simple del pipeline original
+        """
+        print("\n🏗️ PASO 0A: CONSOLIDACIÓN INICIAL (estructura base + Dropout)")
+        print("="*80)
+        
+        # Estados que indican deserción
+        estados_desercion = ["Suspendido", "Permiso", "Interrumpido", "Expulsado", "Cancelado"]
+        
+        print("📊 Información de NOTAS:")
+        print(f"   • Total registros: {len(notas):,}")
+        
+        # Determinar nombres de columnas
+        col_id = 'ID'
+        col_ciclo = 'Ciclo'
+        
+        # Buscar columna de Grado
+        col_grado = None
+        for possible in ['Grado Académico', 'Grado_Academico', 'Grado']:
+            if possible in notas.columns:
+                col_grado = possible
+                break
+        
+        # Buscar columna de Programa
+        col_programa = None
+        for possible in ['Programa Académico Base', 'Programa_Academico_Base', 'Programa']:
+            if possible in notas.columns:
+                col_programa = possible
+                break
+        
+        # Buscar columna de Estado (puede ser 'Estado' o 'Estado Clase')
+        col_estado = None
+        for possible in ['Estado', 'Estado Clase', 'Estado.1']:
+            if possible in notas.columns:
+                col_estado = possible
+                break
+        
+        if not all([col_grado, col_programa, col_estado]):
+            raise ValueError(f"❌ No se encontraron columnas necesarias. Disponibles: {list(notas.columns)}")
+        
+        print(f"   ✓ Columnas identificadas:")
+        print(f"      - Grado: {col_grado}")
+        print(f"      - Programa: {col_programa}")
+        print(f"      - Estado: {col_estado}")
+        
+        # Obtener combinaciones únicas
+        columnas_agrupacion = [col_id, col_grado, col_ciclo]
+        df_unico = notas[columnas_agrupacion + [col_programa, col_estado]].drop_duplicates()
+        
+        print(f"\n⚡ Creando agrupación base...")
+        
+        # Agrupar y obtener valores más frecuentes (moda)
+        agrupacion_base = df_unico.groupby(columnas_agrupacion).agg({
+            col_programa: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0],
+            col_estado: lambda x: x.mode().iloc[0] if len(x.mode()) > 0 else x.iloc[0]
+        }).reset_index()
+        
+        # Renombrar columnas estandarizadas
+        rename_dict = {
+            col_id: 'ID',
+            col_grado: 'Grado_Academico',
+            col_ciclo: 'Ciclo',
+            col_programa: 'Programa_Academico_Base',
+            col_estado: 'Estado'
+        }
+        agrupacion_base = agrupacion_base.rename(columns=rename_dict)
+        
+        # Calcular variable Dropout
+        print(f"   🎯 Calculando variable Dropout...")
+        agrupacion_base['Dropout'] = agrupacion_base['Estado'].apply(
+            lambda estado: 1 if estado in estados_desercion else 0
+        )
+        
+        # Estadísticas
+        dropout_count = agrupacion_base['Dropout'].value_counts()
+        print(f"\n   ✓ Consolidación completada:")
+        print(f"      • Registros consolidados: {len(agrupacion_base):,}")
+        print(f"      • Sin deserción (0): {dropout_count.get(0, 0):,}")
+        print(f"      • En deserción (1): {dropout_count.get(1, 0):,}")
+        
+        return agrupacion_base
+    
+    def _paso_0b_metricas_calificaciones(self, notas_original, notas_consolidada):
+        """
+        PASO 0B: Calcular métricas de calificaciones
+        Replica calcular_metricas_calificaciones_paso2_optimizado
+        """
+        print("\n📊 PASO 0B: CALCULANDO MÉTRICAS DE CALIFICACIONES")
+        print("="*80)
+        
+        # Identificar columnas
+        col_id = 'ID'
+        col_ciclo = 'Ciclo'
+        col_calif = 'Calif'
+        col_creditos = 'Uni Matrd'
+        
+        # Buscar columna de Grado
+        col_grado = None
+        for possible in ['Grado Académico', 'Grado_Academico']:
+            if possible in notas_original.columns:
+                col_grado = possible
+                break
+        
+        # Buscar columnas de ID Curso y Descripción
+        col_id_curso = 'ID Curso' if 'ID Curso' in notas_original.columns else None
+        col_descripcion = 'Descripción' if 'Descripción' in notas_original.columns else None
+        
+        if not all([col_grado, col_calif, col_creditos]):
+            print("   ⚠️ No se encontraron columnas necesarias para métricas")
+            return notas_consolidada
+        
+        # Filtrar datos válidos
+        mask_validos = (
+            notas_original[col_calif].notna() &
+            notas_original[col_creditos].notna() &
+            (notas_original[col_creditos] > 0)
+        )
+        df_validos = notas_original[mask_validos].copy()
+        
+        print(f"   • Registros válidos para cálculo: {len(df_validos):,}")
+        
+        # Agrupar y calcular métricas
+        grupos = df_validos.groupby([col_id, col_grado, col_ciclo])
+        
+        metricas_lista = []
+        
+        for (id_est, grado, ciclo), grupo in grupos:
+            califs = grupo[col_calif].values
+            creditos = grupo[col_creditos].values
+            
+            if len(califs) == 0:
+                continue
+            
+            # Promedio ponderado
+            promedio = np.average(califs, weights=creditos)
+            
+            # Desviación estándar ponderada
+            if len(califs) > 1:
+                varianza = np.average((califs - promedio)**2, weights=creditos)
+                desviacion = np.sqrt(varianza)
+            else:
+                desviacion = 0.0
+            
+            # MIN y sus detalles
+            idx_min = grupo[col_calif].idxmin()
+            min_calif = grupo.loc[idx_min, col_calif]
+            min_creditos = grupo.loc[idx_min, col_creditos]
+            min_id_curso = grupo.loc[idx_min, col_id_curso] if col_id_curso else ''
+            min_descripcion = grupo.loc[idx_min, col_descripcion] if col_descripcion else 'Sin datos'
+            
+            # MAX y sus detalles
+            idx_max = grupo[col_calif].idxmax()
+            max_calif = grupo.loc[idx_max, col_calif]
+            max_creditos = grupo.loc[idx_max, col_creditos]
+            max_id_curso = grupo.loc[idx_max, col_id_curso] if col_id_curso else ''
+            max_descripcion = grupo.loc[idx_max, col_descripcion] if col_descripcion else 'Sin datos'
+            
+            # Rango ponderado
+            contribuciones = califs * creditos
+            rango_ponderado = contribuciones.max() - contribuciones.min()
+            
+            metricas_lista.append({
+                'ID': id_est,
+                'Grado_Academico': grado,
+                'Ciclo': ciclo,
+                'Promedio_Ciclo': round(promedio, 2),
+                'Des_Estandar_Ciclo': round(desviacion, 2),
+                'Min_Ciclo': round(min_calif, 2),
+                'Cred_Min_Calif_Ciclo': min_creditos,
+                'ID_Min_Ciclo': min_id_curso,
+                'Clase_Min_Ciclo': str(min_descripcion),
+                'Max_Ciclo': round(max_calif, 2),
+                'Cred_Max_Calif_Ciclo': max_creditos,
+                'ID_Max_Ciclo': max_id_curso,
+                'Clase_Max_Ciclo': str(max_descripcion),
+                'Rango_Ponderado_Ciclo': round(rango_ponderado, 2)
+            })
+        
+        metricas_df = pd.DataFrame(metricas_lista)
+        
+        # Merge con notas_consolidada
+        notas_con_metricas = notas_consolidada.merge(
+            metricas_df,
+            on=['ID', 'Grado_Academico', 'Ciclo'],
+            how='left'
+        )
+        
+        # Rellenar NaN
+        notas_con_metricas['Clase_Min_Ciclo'] = notas_con_metricas['Clase_Min_Ciclo'].fillna('Sin datos')
+        notas_con_metricas['Clase_Max_Ciclo'] = notas_con_metricas['Clase_Max_Ciclo'].fillna('Sin datos')
+        
+        print(f"   ✓ Métricas calculadas para {len(metricas_df)} grupos")
+        
+        return notas_con_metricas
+    
+    def _paso_0c_metricas_adicionales(self, notas_original, notas_consolidada):
+        """
+        PASO 0C: Agregar métricas adicionales
+        - Num_Materias_Ciclo
+        - Cant_Perdidas
+        - Materias_Vistas
+        """
+        print("\n📊 PASO 0C: CALCULANDO MÉTRICAS ADICIONALES")
+        print("="*80)
+        
+        # Identificar columnas
+        col_id = 'ID'
+        col_ciclo = 'Ciclo'
+        col_calif = 'Calif'
+        col_estado = None
+        
+        # Buscar columna de Programa
+        col_programa = None
+        for possible in ['Programa Académico Base', 'Programa_Academico_Base']:
+            if possible in notas_original.columns:
+                col_programa = possible
+                break
+        
+        # Buscar columna de Estado
+        for possible in ['Estado', 'Estado Clase']:
+            if possible in notas_original.columns:
+                col_estado = possible
+                break
+        
+        if not all([col_programa, col_calif, col_estado]):
+            print("   ⚠️ No se encontraron columnas necesarias para métricas adicionales")
+            return notas_consolidada
+        
+        # Calcular métricas agrupadas
+        grouped = notas_original.groupby([col_id, col_programa, col_ciclo]).agg(
+            Num_Materias_Ciclo=(col_id, 'count'),
+            Cant_Perdidas=(col_calif, lambda x: (x < 3).sum()),
+            Materias_Vistas=(col_estado, lambda x: (x == 'E').sum())
+        ).reset_index()
+        
+        # Renombrar para merge
+        rename_dict = {col_programa: 'Programa_Academico_Base'}
+        grouped = grouped.rename(columns=rename_dict)
+        
+        # Merge con notas_consolidada
+        notas_final = notas_consolidada.merge(
+            grouped,
+            on=['ID', 'Programa_Academico_Base', 'Ciclo'],
+            how='left'
+        )
+        
+        print(f"   ✓ Métricas adicionales agregadas")
+        print(f"      • Num_Materias_Ciclo")
+        print(f"      • Cant_Perdidas")
+        print(f"      • Materias_Vistas")
+        
+        return notas_final
         """
         PASO 0: Consolidación inicial - Crear estructura base con Dropout
         Replica crear_base_consolidada_paso1_simple del pipeline original
