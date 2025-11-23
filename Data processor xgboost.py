@@ -29,28 +29,44 @@ class DataProcessorXGBoost:
         self.model_dir = model_dir
         self._cargar_modelo()
     
-    def _cargar_modelo(self):
-        """Carga el modelo XGBoost y archivos auxiliares"""
-        try:
-            modelo_path = os.path.join(self.model_dir, 'xgboost_modelo.pkl')
-            scaler_path = os.path.join(self.model_dir, 'scaler.pkl')
-            columnas_path = os.path.join(self.model_dir, 'columnas.pkl')
-            
-            if not os.path.exists(modelo_path):
-                # Intentar descargar desde Google Drive si no existe
-                self._descargar_modelo()
-            
-            self.modelo = joblib.load(modelo_path)
-            self.scaler = joblib.load(scaler_path) if os.path.exists(scaler_path) else None
-            self.columnas_modelo = joblib.load(columnas_path) if os.path.exists(columnas_path) else None
-            
-            print("✅ Modelo XGBoost cargado exitosamente")
-            
-        except Exception as e:
-            print(f"⚠️ Error cargando modelo: {str(e)}")
-            self.modelo = None
-            self.scaler = None
-            self.columnas_modelo = None
+def _cargar_modelo(self):
+    """Carga el modelo XGBoost (solo modelo, sin scaler ni columnas)"""
+    try:
+        # Buscar en la raíz (mismo nivel que app.py)
+        modelo_path = 'xgboost_modelo.pkl'
+        
+        if not os.path.exists(modelo_path):
+            raise FileNotFoundError(
+                f"❌ Modelo no encontrado: {modelo_path}\n"
+                f"Sube 'xgboost_modelo.pkl' a la raíz del proyecto (mismo nivel que app.py)"
+            )
+        
+        # Cargar solo el modelo
+        self.modelo = joblib.load(modelo_path)
+        print("✅ Modelo XGBoost cargado exitosamente")
+        
+        # scaler y columnas son opcionales
+        self.scaler = None
+        self.columnas_modelo = None
+        
+        # Si existen, cargarlos
+        if os.path.exists('scaler.pkl'):
+            self.scaler = joblib.load('scaler.pkl')
+            print("✅ Scaler cargado")
+        else:
+            print("⚠️ scaler.pkl no encontrado - continuando sin estandarización")
+        
+        if os.path.exists('columnas.pkl'):
+            self.columnas_modelo = joblib.load('columnas.pkl')
+            print("✅ Columnas cargadas")
+        else:
+            print("⚠️ columnas.pkl no encontrado - usando todas las columnas")
+        
+    except Exception as e:
+        print(f"❌ Error cargando modelo: {str(e)}")
+        self.modelo = None
+        self.scaler = None
+        self.columnas_modelo = None
     
     def _descargar_modelo(self):
         """
