@@ -925,9 +925,9 @@ elif menu == "📊 Resultados":
                     (df_filtered['probabilidad'] <= prob_range[1])
                 ]
                 
-                if search_id:
-                    if 'ID' in df_filtered.columns:
-                        df_filtered = df_filtered[df_filtered['ID'].astype(str).str.contains(search_id, na=False)]
+                if search_index:
+                    if 'Indice' in df_filtered.columns:
+                        df_filtered = df_filtered[df_filtered['indice'].astype(str).str.contains(search_index, na=False)]
                 
                 st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
                 
