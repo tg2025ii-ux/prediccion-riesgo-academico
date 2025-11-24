@@ -150,8 +150,8 @@ with st.sidebar:
     
     st.markdown(f"""
     <div style='padding: 1rem; background-color: {COLORS['text']}; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
-        <h3 style='color: {COLORS['secondary']}; margin-top: 0;'>📊 Sistema de Predicción</h3>
-        <p style='color: {COLORS['text']}; margin-bottom: 0;'>
+        <h3 style='color: {COLORS['text']}; margin-top: 0;'>📊 Sistema de Predicción</h3>
+        <p style='color: {COLORS['secondary']}; margin-bottom: 0;'>
         Herramienta de análisis predictivo para identificar estudiantes en riesgo académico.
         </p>
     </div>
