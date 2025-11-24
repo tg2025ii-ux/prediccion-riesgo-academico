@@ -410,6 +410,7 @@ class DataProcessorAjustes:
         # Renombres
         renombres = {
             'Créditos Inscritos en Ciclo_prom': 'Créditos Inscritos en Ciclo',
+            'Créd.Inscritos y Aprobados Ciclo': 'Créditos Inscritos y Aprobados Ciclo'
         }
         
         data = data.rename(columns={k: v for k, v in renombres.items() if k in data.columns})
