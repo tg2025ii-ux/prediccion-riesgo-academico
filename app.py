@@ -926,8 +926,8 @@ elif menu == "📊 Resultados":
                 ]
                 
                 if search_index:
-                    if 'Indice' in df_filtered.columns:
-                        df_filtered = df_filtered[df_filtered['indice'].astype(str).str.contains(search_index, na=False)]
+                    if 'Index' in df_filtered.columns:
+                        df_filtered = df_filtered[df_filtered['Index'].astype(str).str.contains(search_index, na=False)]
                 
                 st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
                 
