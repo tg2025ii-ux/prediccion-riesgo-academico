@@ -358,7 +358,7 @@ elif menu == "📤 Cargar Datos":
             col1, col2, col3 = st.columns([1, 2, 1])
             
             with col2:
-                if st.button("🚀 PROCESAR Y PREDECIR", type="primary", use_container_width=True):
+                if st.button("🚀 PROCESAR Y PREDECIR", type="text", use_container_width=True):
                     try:
                         st.markdown("---")
                         
