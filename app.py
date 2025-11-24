@@ -957,7 +957,7 @@ elif menu == "📊 Resultados":
                 st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
                 
                 # Seleccionar columnas a mostrar
-                columnas_disponibles = ['Índice', 'Benef. Beca', 'Mult Programa', 'Ciclo', 'Sexo', 
+                columnas_disponibles = ['Benef. Beca', 'Mult Programa', 'Ciclo', 'Sexo', 
                                        'rango_edad', 'Promedio Acumulado', 'Situacion Acad', 
                                        'probabilidad', 'nivel_riesgo']
                 
