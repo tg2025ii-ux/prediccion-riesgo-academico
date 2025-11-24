@@ -18,35 +18,30 @@ class DataProcessorAjustes:
     """
     
     def __init__(self, per_original: Optional[pd.DataFrame] = None,
-                 columnas_modelo_path: Optional[str] = None):
+                 columnas_path: Optional[str] = None):
         """
         Inicializa el procesador de ajustes
         
         Args:
             per_original: DataFrame PER original (para validar continuidad)
-            columnas_modelo_path: Ruta al Excel con nombres de columnas del modelo
+            columnas_path: Ruta al archivo CSV con columnas finales del modelo
         """
         self.per_original = per_original
         self.columnas_modelo = None
-        self.mapeo_columnas = None  # Nuevo: diccionario de renombres
         
-        if columnas_modelo_path:
-            self._cargar_columnas_modelo(columnas_modelo_path)
+        if columnas_path:
+            self._cargar_columnas_modelo(columnas_path)
         
         print("✅ Procesador de Ajustes Finales inicializado")
     
     def _cargar_columnas_modelo(self, path: str):
-        """Carga el mapeo de columnas desde Excel"""
+        """Carga las columnas del modelo desde CSV"""
         try:
-            # Hoja3: mapeo de nombres antiguos → nuevos
-            nombres = pd.read_excel(path, sheet_name='Hoja3', header=None)
-            self.mapeo_columnas = dict(zip(nombres[0], nombres[1]))
-            self.columnas_modelo = list(nombres[1])  # Columnas finales (nuevas)
-            print(f"   ✓ Mapeo de columnas cargado: {len(self.mapeo_columnas)} renombres")
-            print(f"   ✓ Columnas del modelo: {len(self.columnas_modelo)} columnas")
+            columnas_df = pd.read_csv(path)
+            self.columnas_modelo = columnas_df.columns.tolist()
+            print(f"   ✓ Columnas del modelo cargadas: {len(self.columnas_modelo)} columnas")
         except Exception as e:
             print(f"   ⚠️ Error al cargar columnas del modelo: {e}")
-            self.mapeo_columnas = None
             self.columnas_modelo = None
     
     def procesar(self, data_encoded: pd.DataFrame, 
@@ -509,7 +504,7 @@ class DataProcessorAjustes:
     # ============================================================================
     
     def _crear_rango_edad(self, data):
-        """Crear variable rango_edad categórica"""
+        """Crear variable rango_edad categórica y eliminar Edad"""
         print("\n👥 Creando rango de edad...")
         
         if 'Edad' not in data.columns:
@@ -529,12 +524,16 @@ class DataProcessorAjustes:
                 return 4  # ≥50
         
         data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
-        data['rango_edad'] = data['rango_edad'].replace(4, 3)
+        data['rango_edad'] = data['rango_edad'].replace(4, 3)  # 4 → 3 (consolidar mayores de 50)
         
         distribucion = data['rango_edad'].value_counts().sort_index()
         print(f"   ✓ Rango edad creado:")
         for rango, count in distribucion.items():
             print(f"      - Rango {rango}: {count} registros")
+        
+        # ⚠️ ELIMINAR COLUMNA EDAD
+        data = data.drop(columns=['Edad'])
+        print("   ✓ Columna 'Edad' eliminada (ya no es necesaria)")
         
         return data
     
@@ -543,44 +542,44 @@ class DataProcessorAjustes:
     # ============================================================================
     
     def _aplicar_columnas_modelo(self, data):
-        """Aplicar orden y selección de columnas del modelo"""
+        """Aplicar orden y selección de columnas del modelo (desde columnas.csv)"""
         print("\n📋 Aplicando columnas del modelo...")
         
         if not self.columnas_modelo:
             print("   ⚠️ Columnas del modelo no cargadas, saltando...")
             return data
         
-        # PASO 1: Renombrar columnas usando mapeo (Hoja3)
-        if self.mapeo_columnas:
-            print(f"   🔄 Renombrando columnas usando mapeo...")
-            columnas_antes = len(data.columns)
-            
-            # Solo renombrar las que existen en el mapeo
-            renombres_aplicados = {k: v for k, v in self.mapeo_columnas.items() if k in data.columns}
-            data = data.rename(columns=renombres_aplicados)
-            
-            print(f"      ✓ {len(renombres_aplicados)} columnas renombradas")
+        print(f"   📝 Seleccionando y ordenando columnas...")
         
-        # PASO 2: Aplicar columnas deseadas (columnas_modelo)
-        print(f"   📝 Aplicando selección de columnas...")
-        
-        # Columnas existentes en data que están en columnas_modelo
+        # PASO 1: Columnas que ya existen en data
         cols_existentes = [col for col in self.columnas_modelo if col in data.columns]
         
-        # Columnas con "_" que no existen → crear con 0
-        cols_a_crear = [col for col in self.columnas_modelo if "_" in col and col not in data.columns]
+        # PASO 2: Columnas que NO existen pero tienen "_" → crear con 0
+        cols_a_crear = [
+            col for col in self.columnas_modelo 
+            if col not in data.columns and "_" in col
+        ]
         
         if cols_a_crear:
             print(f"      ✓ Creando {len(cols_a_crear)} columnas faltantes con 0")
             for col in cols_a_crear:
                 data[col] = 0
         
-        # PASO 3: Ordenar según columnas_modelo (mantener solo las deseadas)
-        data = data[cols_existentes + cols_a_crear]
+        # PASO 3: Construir data solo con las columnas deseadas
+        columnas_finales = cols_existentes + cols_a_crear
+        
+        # PASO 4: Ordenar según columnas_modelo (mantener el orden exacto)
+        data = data[[col for col in self.columnas_modelo if col in columnas_finales]]
         
         print(f"   ✓ Columnas finales: {len(data.columns)}")
         print(f"      - Existentes: {len(cols_existentes)}")
         print(f"      - Creadas: {len(cols_a_crear)}")
+        
+        # Verificar que el orden es correcto
+        if list(data.columns) == [col for col in self.columnas_modelo if col in columnas_finales]:
+            print("   ✓ Orden de columnas: CORRECTO")
+        else:
+            print("   ⚠️ Orden de columnas: puede no coincidir exactamente")
         
         return data
     
@@ -619,19 +618,19 @@ class DataProcessorAjustes:
 # FUNCIÓN PRINCIPAL PARA STREAMLIT
 # =============================================================================
 
-def procesar_ajustes_completo(data_encoded_df, per_original_df=None, columnas_modelo_path=None):
+def procesar_ajustes_completo(data_encoded_df, per_original_df=None, columnas_path=None):
     """
     Función para usar en Streamlit que procesa ajustes finales
     
     Args:
         data_encoded_df: DataFrame resultado del encoding
         per_original_df: DataFrame PER original (opcional, para validación)
-        columnas_modelo_path: Ruta al Excel con columnas del modelo (opcional)
+        columnas_path: Ruta al CSV con columnas del modelo (columnas.csv)
         
     Returns:
         DataFrame listo para predicción
     """
-    procesador = DataProcessorAjustes(per_original_df, columnas_modelo_path)
+    procesador = DataProcessorAjustes(per_original_df, columnas_path)
     data_final = procesador.procesar(data_encoded_df)
     return data_final
 
