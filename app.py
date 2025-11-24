@@ -358,7 +358,7 @@ elif menu == "📤 Cargar Datos":
             col1, col2, col3 = st.columns([1, 2, 1])
             
             with col2:
-                if st.button("🚀 PROCESAR Y PREDECIR", type="primary", use_container_width=True):
+                if st.button("🚀 PROCESAR Y PREDECIR", type="danger", use_container_width=True):
                     try:
                         st.markdown("---")
                         
@@ -369,8 +369,8 @@ elif menu == "📤 Cargar Datos":
                             # ============================================================
                             
                             st.markdown(f"""
-                            <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']};'>
-                                <h4 style='color: {COLORS['text']}; margin: 0;'>⏳ Procesando datos (Limpieza → Encoding → Ajustes)...</h4>
+                            <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['background']};'>
+                                <h4 style='color: {COLORS['danger']}; margin: 0;'>⏳ Procesando datos (Limpieza → Encoding → Ajustes)...</h4>
                             </div>
                             """, unsafe_allow_html=True)
                             
@@ -401,8 +401,8 @@ elif menu == "📤 Cargar Datos":
                             st.markdown("---")
                             st.markdown(f"""
                             <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']}; margin-top: 1rem;'>
-                                <h4 style='color: {COLORS['text']}; margin: 0;'>🤖 Ejecutando predicción con XGBoost...</h4>
-                                <p style='color: {COLORS['text']}; margin-top: 0.5rem; margin-bottom: 0;'>Usando modelo: xgboost_modelo.pkl</p>
+                                <h4 style='color: {COLORS['danger']}; margin: 0;'>🤖 Ejecutando predicción con XGBoost...</h4>
+                                <p style='color: {COLORS['danger']}; margin-top: 0.5rem; margin-bottom: 0;'>Usando modelo: xgboost_modelo.pkl</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
