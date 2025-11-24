@@ -265,8 +265,8 @@ elif menu == "📤 Cargar Datos":
     # Instrucciones
     st.markdown(f"""
     <div style='padding: 1.5rem; background-color: #FFF9C4; border-radius: 10px; border-left: 4px solid {COLORS['warning']}; margin-bottom: 2rem;'>
-        <h3 style='color: {COLORS['text']}; margin-top: 0;'>📋 Instrucciones de Carga</h3>
-        <p style='color: {COLORS['text']}; margin-bottom: 0.5rem;'>
+        <h3 style='color: {COLORS['danger']}; margin-top: 0;'>📋 Instrucciones de Carga</h3>
+        <p style='color: {COLORS['danger']}; margin-bottom: 0.5rem;'>
         Debes cargar <b>UN archivo Excel</b> que contenga <b>4 hojas (sheets)</b> con los siguientes nombres:
         </p>
         <ul style='color: {COLORS['text']}; margin-bottom: 0;'>
