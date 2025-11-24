@@ -275,7 +275,7 @@ elif menu == "📤 Cargar Datos":
             <li><b>PROM</b> - Promedios académicos</li>
             <li><b>ADM</b> - Datos de admisión</li>
         </ul>
-        <p style='color: {COLORS['text']}; margin-top: 1rem; margin-bottom: 0;'>
+        <p style='color: {COLORS['danger']}; margin-top: 1rem; margin-bottom: 0;'>
         <b>IMPORTANTE:</b> Los nombres de las hojas deben ser exactamente como se muestran arriba.
         </p>
     </div>
