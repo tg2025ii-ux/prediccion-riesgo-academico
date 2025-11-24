@@ -1,5 +1,5 @@
 """
-Data Processor XGBoost - Con método predecir_procesado integrado
+Data Processor XGBoost - Versión Corregida con Cálculo Correcto de Probabilidades
 """
 
 import pandas as pd
@@ -156,85 +156,7 @@ class DataProcessorXGBoost:
         else:
             print("✅ Modelo ya existe localmente")
     
-    def predecir(self, data: pd.DataFrame) -> pd.DataFrame:
-        """
-        Realiza predicciones con el modelo XGBoost
-        NOTA: Este método asume que los datos ya fueron procesados
-        """
-        print("\n🎯 INICIANDO PREDICCIÓN...")
-        print(f"   Estado del modelo: {'✅ Cargado' if self.modelo is not None else '❌ NO cargado'}")
-        print(f"   Tipo de modelo: {type(self.modelo).__name__}")
-        print(f"   Registros a predecir: {len(data)}")
-        
-        if self.modelo is None:
-            raise ValueError("❌ Modelo no cargado")
-        
-        print("🎯 Realizando predicciones...")
-        
-        try:
-            # Preparar datos
-            if self.columnas_modelo is not None:
-                for col in self.columnas_modelo:
-                    if col not in data.columns:
-                        data[col] = 0
-                X = data[self.columnas_modelo].copy()
-            else:
-                X = data.copy()
-            
-            print(f"   📊 Shape de X: {X.shape}")
-            
-            # Verificar duplicados
-            if X.columns.duplicated().any():
-                print("   ⚠️ Columnas duplicadas detectadas, eliminando...")
-                X = X.loc[:, ~X.columns.duplicated()]
-            
-            # Asegurar que todo sea numérico
-            for col in X.columns:
-                if X[col].dtype == 'object':
-                    X[col] = pd.to_numeric(X[col], errors='coerce').fillna(0)
-            
-            # Estandarizar
-            if self.scaler is not None:
-                print("   🔧 Aplicando scaler...")
-                X_scaled = self.scaler.transform(X)
-            else:
-                X_scaled = X.values
-            
-            print(f"   📊 Shape final: {X_scaled.shape}")
-            
-            # Predecir
-            modelo_tipo = type(self.modelo).__name__
-            
-            if 'ExponentiatedGradient' in modelo_tipo:
-                print("   ℹ️ Detectado modelo con mitigación (ExponentiatedGradient)")
-                predicciones = self.modelo.predict(X_scaled)
-                probabilidades = np.where(predicciones == 1, 0.9, 0.1)
-            else:
-                probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
-            
-            # Agregar resultados
-            resultado = data.copy()
-            resultado['probabilidad'] = probabilidades
-            resultado['nivel_riesgo'] = pd.cut(
-                probabilidades,
-                bins=[0, 0.3, 0.6, 1.0],
-                labels=["Bajo", "Medio", "Alto"]
-            )
-            
-            print(f"✅ Predicciones completadas: {len(resultado)} estudiantes")
-            print(f"   🟢 Bajo: {(resultado['nivel_riesgo']=='Bajo').sum()}")
-            print(f"   🟡 Medio: {(resultado['nivel_riesgo']=='Medio').sum()}")
-            print(f"   🔴 Alto: {(resultado['nivel_riesgo']=='Alto').sum()}")
-            
-            return resultado
-            
-        except Exception as e:
-            print(f"❌ Error en predicción: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise
-    
-  def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
+    def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
         """
         Realiza predicciones con datos YA PROCESADOS por el pipeline integrado
         
@@ -449,7 +371,6 @@ class DataProcessorXGBoost:
             import traceback
             traceback.print_exc()
             raise
-
     
     def get_summary_stats(self, df: pd.DataFrame) -> dict:
         """Genera estadísticas resumidas del dataframe procesado"""
