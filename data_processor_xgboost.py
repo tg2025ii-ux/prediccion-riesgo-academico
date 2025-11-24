@@ -1,6 +1,5 @@
 """
-Data Processor XGBoost - Réplica COMPLETA del Pipeline__2_
-Genera exactamente las 157 features que el modelo espera
+Data Processor XGBoost - Con método predecir_procesado integrado
 """
 
 import pandas as pd
@@ -11,8 +10,7 @@ from typing import Dict, Tuple
 
 class DataProcessorXGBoost:
     """
-    Procesador que replica EXACTAMENTE el Pipeline__2_.ipynb
-    Incluye todas las transformaciones y métricas de calificaciones
+    Procesador que carga y ejecuta el modelo XGBoost
     """
     
     def __init__(self, model_dir='.'):
@@ -158,27 +156,11 @@ class DataProcessorXGBoost:
         else:
             print("✅ Modelo ya existe localmente")
     
-    def procesar_archivo_excel(self, archivo_path):
-        """Procesa un archivo Excel con 4 hojas"""
-        notas = pd.read_excel(archivo_path, sheet_name='NOTAS')
-        per = pd.read_excel(archivo_path, sheet_name='PER')
-        prom = pd.read_excel(archivo_path, sheet_name='PROM')
-        adm = pd.read_excel(archivo_path, sheet_name='ADM')
-        return self._pipeline_completo(notas, per, prom, adm)
-    
-    def procesar_dataframes(self, notas_df, per_df, prom_df, adm_df) -> pd.DataFrame:
-        """Procesa 4 DataFrames separados (para Streamlit)"""
-        return self._pipeline_completo(notas_df, per_df, prom_df, adm_df)
-    
-    def _pipeline_completo(self, notas, per, prom, adm) -> pd.DataFrame:
-        """Implementa el Pipeline__2_.ipynb COMPLETO"""
-        print("\n" + "="*70)
-        print("🔄 INICIANDO PIPELINE DE PROCESAMIENTO COMPLETO")
-        print("="*70)
-        
-    
     def predecir(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Realiza predicciones con el modelo XGBoost"""
+        """
+        Realiza predicciones con el modelo XGBoost
+        NOTA: Este método asume que los datos ya fueron procesados
+        """
         print("\n🎯 INICIANDO PREDICCIÓN...")
         print(f"   Estado del modelo: {'✅ Cargado' if self.modelo is not None else '❌ NO cargado'}")
         print(f"   Tipo de modelo: {type(self.modelo).__name__}")
@@ -245,169 +227,180 @@ class DataProcessorXGBoost:
             print(f"   🔴 Alto: {(resultado['nivel_riesgo']=='Alto').sum()}")
             
             return resultado
-
+            
+        except Exception as e:
+            print(f"❌ Error en predicción: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
         """
-AGREGAR ESTE MÉTODO A data_processor_xgboost.py
-Después del método predecir() existente
-"""
-
-def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
-    """
-    Realiza predicciones con datos YA PROCESADOS por el pipeline integrado
-    
-    Este método NO procesa los datos, solo ejecuta la predicción con el modelo XGBoost.
-    Usar cuando los datos vienen de:
-    - data_processor_limpieza_COMPLETO.py
-    - data_processor_encoding.py
-    - data_processor_ajustes.py
-    
-    Args:
-        data_procesada: DataFrame ya procesado (limpieza + encoding + ajustes)
+        Realiza predicciones con datos YA PROCESADOS por el pipeline integrado
         
-    Returns:
-        DataFrame con columnas adicionales:
-        - probabilidad: Probabilidad de deserción (0-1)
-        - nivel_riesgo: Nivel de riesgo ("Bajo", "Medio", "Alto")
-    """
-    print("\n" + "="*80)
-    print("🎯 INICIANDO PREDICCIÓN CON DATOS PROCESADOS")
-    print("="*80)
-    print(f"   📊 Registros recibidos: {len(data_procesada):,}")
-    print(f"   📊 Columnas recibidas: {len(data_procesada.columns)}")
-    
-    # Verificar que el modelo esté cargado
-    if self.modelo is None:
-        raise ValueError(
-            "❌ Modelo XGBoost no cargado.\n"
-            "   Verifica que 'xgboost_modelo.pkl' esté en la raíz del proyecto."
-        )
-    
-    print(f"   ✅ Modelo cargado: {type(self.modelo).__name__}")
-    
-    try:
-        # ============================================================
-        # PREPARACIÓN DE DATOS
-        # ============================================================
+        Este método NO procesa los datos, solo ejecuta la predicción con el modelo XGBoost.
+        Usar cuando los datos vienen de:
+        - data_processor_limpieza_COMPLETO.py
+        - data_processor_encoding.py
+        - data_processor_ajustes.py
         
-        X = data_procesada.copy()
-        
-        print("\n🔧 Preparando datos para predicción...")
-        
-        # 1. Eliminar columnas no numéricas
-        cols_object = X.select_dtypes(include=['object']).columns.tolist()
-        if cols_object:
-            print(f"   → Eliminando {len(cols_object)} columnas no numéricas: {cols_object[:5]}...")
-            X = X.drop(columns=cols_object)
-        
-        # 2. Eliminar columnas duplicadas
-        if X.columns.duplicated().any():
-            duplicados = X.columns[X.columns.duplicated()].tolist()
-            print(f"   → Eliminando {len(duplicados)} columnas duplicadas: {duplicados[:5]}...")
-            X = X.loc[:, ~X.columns.duplicated()]
-        
-        # 3. Manejar valores infinitos
-        X = X.replace([np.inf, -np.inf], np.nan)
-        
-        # 4. Rellenar NaN con 0
-        if X.isnull().any().any():
-            nulos_count = X.isnull().sum().sum()
-            print(f"   → Rellenando {nulos_count:,} valores NaN con 0")
-            X = X.fillna(0)
-        
-        # 5. Alinear con columnas del modelo (si existen)
-        if self.columnas_modelo is not None:
-            print(f"   → Alineando con columnas del modelo ({len(self.columnas_modelo)} columnas esperadas)")
+        Args:
+            data_procesada: DataFrame ya procesado (limpieza + encoding + ajustes)
             
-            # Agregar columnas faltantes con 0
-            cols_faltantes = [col for col in self.columnas_modelo if col not in X.columns]
-            if cols_faltantes:
-                print(f"      • Agregando {len(cols_faltantes)} columnas faltantes con 0")
-                for col in cols_faltantes:
-                    X[col] = 0
-            
-            # Eliminar columnas extra
-            cols_extra = [col for col in X.columns if col not in self.columnas_modelo]
-            if cols_extra:
-                print(f"      • Eliminando {len(cols_extra)} columnas extra")
-                X = X.drop(columns=cols_extra)
-            
-            # Ordenar según modelo
-            X = X[self.columnas_modelo]
-        
-        print(f"   ✅ Datos preparados: {X.shape}")
-        
-        # ============================================================
-        # APLICAR SCALER (si existe)
-        # ============================================================
-        
-        if self.scaler is not None:
-            print("   🔧 Aplicando scaler (estandarización)...")
-            X_scaled = self.scaler.transform(X)
-        else:
-            print("   ℹ️ No hay scaler, usando datos sin estandarizar")
-            X_scaled = X.values
-        
-        # ============================================================
-        # PREDICCIÓN CON xgboost_modelo.pkl
-        # ============================================================
-        
-        print("\n🤖 Ejecutando predicción con XGBoost...")
-        
-        # Detectar tipo de modelo
-        modelo_tipo = type(self.modelo).__name__
-        print(f"   Tipo de modelo: {modelo_tipo}")
-        
-        if 'ExponentiatedGradient' in modelo_tipo:
-            # Modelo con mitigación de sesgo
-            print("   ℹ️ Modelo con mitigación de sesgo detectado")
-            predicciones = self.modelo.predict(X_scaled)
-            probabilidades = np.where(predicciones == 1, 0.9, 0.1)
-        else:
-            # Modelo estándar (XGBoost, RandomForest, etc.)
-            if hasattr(self.modelo, 'predict_proba'):
-                probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
-            else:
-                # Fallback si no tiene predict_proba
-                predicciones = self.modelo.predict(X_scaled)
-                probabilidades = predicciones.astype(float)
-        
-        print(f"   ✅ Predicciones generadas: {len(probabilidades):,}")
-        
-        # ============================================================
-        # AGREGAR RESULTADOS AL DATAFRAME
-        # ============================================================
-        
-        resultado = data_procesada.copy()
-        resultado['probabilidad'] = probabilidades
-        
-        # Clasificar nivel de riesgo
-        resultado['nivel_riesgo'] = pd.cut(
-            probabilidades,
-            bins=[0, 0.3, 0.6, 1.0],
-            labels=["Bajo", "Medio", "Alto"]
-        )
-        
-        # ============================================================
-        # ESTADÍSTICAS FINALES
-        # ============================================================
-        
+        Returns:
+            DataFrame con columnas adicionales:
+            - probabilidad: Probabilidad de deserción (0-1)
+            - nivel_riesgo: Nivel de riesgo ("Bajo", "Medio", "Alto")
+        """
         print("\n" + "="*80)
-        print("✅ PREDICCIÓN COMPLETADA")
+        print("🎯 INICIANDO PREDICCIÓN CON DATOS PROCESADOS")
         print("="*80)
-        print(f"   📊 Estudiantes analizados: {len(resultado):,}")
-        print(f"   📊 Probabilidad promedio: {probabilidades.mean():.2%}")
-        print(f"   📊 Probabilidad mínima: {probabilidades.min():.2%}")
-        print(f"   📊 Probabilidad máxima: {probabilidades.max():.2%}")
-        print("\n   📈 Distribución de riesgo:")
-        print(f"      🟢 Bajo (<30%):   {(resultado['nivel_riesgo']=='Bajo').sum():>6,} estudiantes")
-        print(f"      🟡 Medio (30-60%): {(resultado['nivel_riesgo']=='Medio').sum():>6,} estudiantes")
-        print(f"      🔴 Alto (>60%):    {(resultado['nivel_riesgo']=='Alto').sum():>6,} estudiantes")
-        print("="*80 + "\n")
+        print(f"   📊 Registros recibidos: {len(data_procesada):,}")
+        print(f"   📊 Columnas recibidas: {len(data_procesada.columns)}")
         
-        return resultado
+        # Verificar que el modelo esté cargado
+        if self.modelo is None:
+            raise ValueError(
+                "❌ Modelo XGBoost no cargado.\n"
+                "   Verifica que 'xgboost_modelo.pkl' esté en la raíz del proyecto."
+            )
         
-    except Exception as e:
-        print(f"\n❌ ERROR EN PREDICCIÓN: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise
+        print(f"   ✅ Modelo cargado: {type(self.modelo).__name__}")
+        
+        try:
+            # ============================================================
+            # PREPARACIÓN DE DATOS
+            # ============================================================
+            
+            X = data_procesada.copy()
+            
+            print("\n🔧 Preparando datos para predicción...")
+            
+            # 1. Eliminar columnas no numéricas
+            cols_object = X.select_dtypes(include=['object']).columns.tolist()
+            if cols_object:
+                print(f"   → Eliminando {len(cols_object)} columnas no numéricas: {cols_object[:5]}...")
+                X = X.drop(columns=cols_object)
+            
+            # 2. Eliminar columnas duplicadas
+            if X.columns.duplicated().any():
+                duplicados = X.columns[X.columns.duplicated()].tolist()
+                print(f"   → Eliminando {len(duplicados)} columnas duplicadas: {duplicados[:5]}...")
+                X = X.loc[:, ~X.columns.duplicated()]
+            
+            # 3. Manejar valores infinitos
+            X = X.replace([np.inf, -np.inf], np.nan)
+            
+            # 4. Rellenar NaN con 0
+            if X.isnull().any().any():
+                nulos_count = X.isnull().sum().sum()
+                print(f"   → Rellenando {nulos_count:,} valores NaN con 0")
+                X = X.fillna(0)
+            
+            # 5. Alinear con columnas del modelo (si existen)
+            if self.columnas_modelo is not None:
+                print(f"   → Alineando con columnas del modelo ({len(self.columnas_modelo)} columnas esperadas)")
+                
+                # Agregar columnas faltantes con 0
+                cols_faltantes = [col for col in self.columnas_modelo if col not in X.columns]
+                if cols_faltantes:
+                    print(f"      • Agregando {len(cols_faltantes)} columnas faltantes con 0")
+                    for col in cols_faltantes:
+                        X[col] = 0
+                
+                # Eliminar columnas extra
+                cols_extra = [col for col in X.columns if col not in self.columnas_modelo]
+                if cols_extra:
+                    print(f"      • Eliminando {len(cols_extra)} columnas extra")
+                    X = X.drop(columns=cols_extra)
+                
+                # Ordenar según modelo
+                X = X[self.columnas_modelo]
+            
+            print(f"   ✅ Datos preparados: {X.shape}")
+            
+            # ============================================================
+            # APLICAR SCALER (si existe)
+            # ============================================================
+            
+            if self.scaler is not None:
+                print("   🔧 Aplicando scaler (estandarización)...")
+                X_scaled = self.scaler.transform(X)
+            else:
+                print("   ℹ️ No hay scaler, usando datos sin estandarizar")
+                X_scaled = X.values
+            
+            # ============================================================
+            # PREDICCIÓN CON xgboost_modelo.pkl
+            # ============================================================
+            
+            print("\n🤖 Ejecutando predicción con XGBoost...")
+            
+            # Detectar tipo de modelo
+            modelo_tipo = type(self.modelo).__name__
+            print(f"   Tipo de modelo: {modelo_tipo}")
+            
+            if 'ExponentiatedGradient' in modelo_tipo:
+                # Modelo con mitigación de sesgo
+                print("   ℹ️ Modelo con mitigación de sesgo detectado")
+                predicciones = self.modelo.predict(X_scaled)
+                probabilidades = np.where(predicciones == 1, 0.9, 0.1)
+            else:
+                # Modelo estándar (XGBoost, RandomForest, etc.)
+                if hasattr(self.modelo, 'predict_proba'):
+                    probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
+                else:
+                    # Fallback si no tiene predict_proba
+                    predicciones = self.modelo.predict(X_scaled)
+                    probabilidades = predicciones.astype(float)
+            
+            print(f"   ✅ Predicciones generadas: {len(probabilidades):,}")
+            
+            # ============================================================
+            # AGREGAR RESULTADOS AL DATAFRAME
+            # ============================================================
+            
+            resultado = data_procesada.copy()
+            resultado['probabilidad'] = probabilidades
+            
+            # Clasificar nivel de riesgo
+            resultado['nivel_riesgo'] = pd.cut(
+                probabilidades,
+                bins=[0, 0.3, 0.6, 1.0],
+                labels=["Bajo", "Medio", "Alto"]
+            )
+            
+            # ============================================================
+            # ESTADÍSTICAS FINALES
+            # ============================================================
+            
+            print("\n" + "="*80)
+            print("✅ PREDICCIÓN COMPLETADA")
+            print("="*80)
+            print(f"   📊 Estudiantes analizados: {len(resultado):,}")
+            print(f"   📊 Probabilidad promedio: {probabilidades.mean():.2%}")
+            print(f"   📊 Probabilidad mínima: {probabilidades.min():.2%}")
+            print(f"   📊 Probabilidad máxima: {probabilidades.max():.2%}")
+            print("\n   📈 Distribución de riesgo:")
+            print(f"      🟢 Bajo (<30%):   {(resultado['nivel_riesgo']=='Bajo').sum():>6,} estudiantes")
+            print(f"      🟡 Medio (30-60%): {(resultado['nivel_riesgo']=='Medio').sum():>6,} estudiantes")
+            print(f"      🔴 Alto (>60%):    {(resultado['nivel_riesgo']=='Alto').sum():>6,} estudiantes")
+            print("="*80 + "\n")
+            
+            return resultado
+            
+        except Exception as e:
+            print(f"\n❌ ERROR EN PREDICCIÓN: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    def get_summary_stats(self, df: pd.DataFrame) -> dict:
+        """Genera estadísticas resumidas del dataframe procesado"""
+        stats = {
+            'total_estudiantes': len(df),
+            'riesgo_bajo': (df['nivel_riesgo'] == 'Bajo').sum() if 'nivel_riesgo' in df.columns else 0,
+            'riesgo_medio': (df['nivel_riesgo'] == 'Medio').sum() if 'nivel_riesgo' in df.columns else 0,
+            'riesgo_alto': (df['nivel_riesgo'] == 'Alto').sum() if 'nivel_riesgo' in df.columns else 0,
+        }
+        return stats
