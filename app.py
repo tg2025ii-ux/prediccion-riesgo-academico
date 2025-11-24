@@ -48,7 +48,7 @@ st.markdown("""
 
 # Colores institucionales
 COLORS = {
-    "primary": "#3A4A3D",      # Verde oscuro (SÓLIDO)
+    "primary": "#FFFFFF",      # Verde oscuro (SÓLIDO)
     "secondary": "#8B9D83",    # Verde claro (ARENA)
     "accent": "#5C6B5E",       # Verde medio (SERENO)
     "background": "#FAFAFA",   # Fondo
