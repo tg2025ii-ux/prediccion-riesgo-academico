@@ -276,18 +276,12 @@ if menu == "🏠 Inicio":
 
 # SECCIÓN PARA REEMPLAZAR EN APP.PY - CARGAR DATOS
 
-"""
-Sección actualizada de "📤 Cargar Datos"
-Reemplaza la sección correspondiente en tu app.py
-"""
-
 # ====================================================================
 # PÁGINA: CARGAR DATOS (REEMPLAZAR EN TU APP.PY)
 # ====================================================================
 
 # Agregar este import al inicio del archivo
 from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
-
 
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
