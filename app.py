@@ -277,7 +277,7 @@ if menu == "🏠 Inicio":
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
     
-   st.markdown("### ⚙️ Cómo usar esta herramienta")
+       st.markdown("### ⚙️ Cómo usar esta herramienta")
     
     steps = """
     1. **📤 Ve a "Cargar Datos"** en el menú lateral
