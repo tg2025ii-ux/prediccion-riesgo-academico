@@ -269,7 +269,7 @@ elif menu == "📤 Cargar Datos":
         <p style='color: {COLORS['danger']}; margin-bottom: 0.5rem;'>
         Debes cargar <b>UN archivo Excel</b> que contenga <b>4 hojas (sheets)</b> con los siguientes nombres:
         </p>
-        <ul style='color: {COLORS['text']}; margin-bottom: 0;'>
+        <ul style='color: {COLORS['danger']}; margin-bottom: 0;'>
             <li><b>NOTAS</b> - Calificaciones y materias de estudiantes</li>
             <li><b>PER</b> - Información personal de estudiantes</li>
             <li><b>PROM</b> - Promedios académicos</li>
