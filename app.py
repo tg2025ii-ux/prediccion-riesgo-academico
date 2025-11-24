@@ -51,7 +51,7 @@ COLORS = {
     "primary": "#3A4A3D",      # Verde oscuro (SÓLIDO)
     "secondary": "#8B9D83",    # Verde claro (ARENA)
     "accent": "#5C6B5E",       # Verde medio (SERENO)
-    "background": "#FAFAFA",   # Fondo
+    "background": "#FFFFFF",   # Fondo
     "text": "#0077FF",         # Texto oscuro
     "success": "#8B9D83",      # Verde claro para éxitos
     "warning": "#5C6B5E",      # Verde medio para advertencias
