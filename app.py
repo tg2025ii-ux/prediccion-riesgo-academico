@@ -274,13 +274,6 @@ if menu == "🏠 Inicio":
         </div>
         """, unsafe_allow_html=True)
 
-# SECCIÓN PARA REEMPLAZAR EN APP.PY - CARGAR DATOS
-
-# ====================================================================
-# PÁGINA: CARGAR DATOS (REEMPLAZAR EN TU APP.PY)
-# ====================================================================
-
-# Agregar este import al inicio del archivo
 from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
 
 elif menu == "📤 Cargar Datos":
