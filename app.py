@@ -358,7 +358,7 @@ elif menu == "📤 Cargar Datos":
             col1, col2, col3 = st.columns([1, 2, 1])
             
             with col2:
-                if st.button("🚀 PROCESAR Y PREDECIR", type="text", use_container_width=True):
+                if st.button("🚀 PROCESAR Y PREDECIR", type="primary", use_container_width=True):
                     try:
                         st.markdown("---")
                         
@@ -369,7 +369,7 @@ elif menu == "📤 Cargar Datos":
                             # ============================================================
                             
                             st.markdown(f"""
-                            <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['background']};'>
+                            <div style='padding: 1rem; background-color: {COLORS['text']}; border-radius: 10px; border-left: 4px solid {COLORS['text']};'>
                                 <h4 style='color: {COLORS['danger']}; margin: 0;'>⏳ Procesando datos (Limpieza → Encoding → Ajustes)...</h4>
                             </div>
                             """, unsafe_allow_html=True)
