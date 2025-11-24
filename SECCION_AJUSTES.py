@@ -54,12 +54,12 @@ def seccion_ajustes():
     
     # Verificar archivos necesarios
     import os
-    libro1_existe = os.path.exists("Libro1.xlsx")
+    columnas_csv_existe = os.path.exists("columnas.csv")
     
-    if libro1_existe:
-        st.success("✅ Archivo 'Libro1.xlsx' encontrado")
+    if columnas_csv_existe:
+        st.success("✅ Archivo 'columnas.csv' encontrado")
     else:
-        st.warning("⚠️ Archivo 'Libro1.xlsx' no encontrado (opcional para columnas del modelo)")
+        st.warning("⚠️ Archivo 'columnas.csv' no encontrado (opcional para columnas del modelo)")
     
     # Tabs para diferentes opciones
     tab_upload, tab_session = st.tabs(["📤 Subir Base Codificada", "💾 Usar desde Sesión"])
@@ -174,8 +174,8 @@ def seccion_ajustes():
             )
             
             usar_columnas_modelo = st.checkbox(
-                "Aplicar columnas del modelo (Libro1.xlsx)",
-                value=libro1_existe,
+                "Aplicar columnas del modelo (columnas.csv)",
+                value=columnas_csv_existe,
                 help="Ordena columnas según el modelo entrenado"
             )
         
@@ -196,13 +196,13 @@ def seccion_ajustes():
                 try:
                     # Preparar argumentos
                     per_original = st.session_state.get('per_original_upload', None) if usar_per else None
-                    columnas_modelo_path = "Libro1.xlsx" if usar_columnas_modelo and libro1_existe else None
+                    columnas_path = "columnas.csv" if usar_columnas_modelo and columnas_csv_existe else None
                     
                     # Procesar ajustes
                     data_final = procesar_ajustes_completo(
                         data_encoded, 
                         per_original,
-                        columnas_modelo_path
+                        columnas_path
                     )
                     
                     # Obtener logs
