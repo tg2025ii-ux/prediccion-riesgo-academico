@@ -277,43 +277,6 @@ if menu == "🏠 Inicio":
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
     
-    
-    st.markdown("---")
-    
-    st.markdown("### 🎯 Niveles de Riesgo")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown(f"""
-        <div class='metric-card risk-low'>
-            <h4>🟢 Riesgo Bajo</h4>
-            <p><b>Probabilidad < 30%</b></p>
-            <p>Estudiante con desempeño satisfactorio. Continuar con seguimiento regular.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div class='metric-card risk-medium'>
-            <h4>🟡 Riesgo Medio</h4>
-            <p><b>Probabilidad 30-60%</b></p>
-            <p>Requiere atención. Considerar tutorías o acompañamiento académico.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-        <div class='metric-card risk-high'>
-            <h4>🔴 Riesgo Alto</h4>
-            <p><b>Probabilidad > 60%</b></p>
-            <p>Requiere intervención inmediata. Apoyo prioritario necesario.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-elif menu == "📤 Cargar Datos":
-    st.title("📤 Cargar Bases de Datos de la Universidad")
-    
     # Instrucciones
     st.markdown(f"""
     <div style='padding: 1.5rem; background-color: #FFF9C4; border-radius: 10px; border-left: 4px solid {COLORS['warning']}; margin-bottom: 2rem;'>
