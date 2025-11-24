@@ -195,29 +195,35 @@ class DataProcessorXGBoost:
             
             print("\n🔧 Preparando datos para predicción...")
             
-            # 1. Eliminar columnas problemáticas PRIMERO
+            # 1. Eliminar SOLO columnas problemáticas que NO están en el modelo
             columnas_a_eliminar = []
             
-            # Buscar desercion/deserción
+            # Buscar desercion/deserción (SIEMPRE eliminar)
             for col in X.columns:
                 col_lower = col.lower()
                 if 'desercion' in col_lower or 'deserción' in col_lower:
                     columnas_a_eliminar.append(col)
+                    print(f"   ❌ Eliminando columna deserción: '{col}'")
             
-            # Buscar Estado (Dropout)
+            # Buscar Estado (Dropout) (SIEMPRE eliminar)
             for col in X.columns:
                 if col == 'Estado (Dropout)' or col == 'Estado_Dropout':
                     columnas_a_eliminar.append(col)
+                    print(f"   ❌ Eliminando Estado Dropout: '{col}'")
             
-            # Eliminar columnas identificadoras
-            cols_id = ['ID', 'Mult Programa', 'Ciclo']
-            for col in cols_id:
-                if col in X.columns:
-                    columnas_a_eliminar.append(col)
+            # SOLO eliminar ID, Mult Programa, Ciclo si NO están en columnas_modelo
+            if self.columnas_modelo is not None:
+                cols_id_posibles = ['ID', 'Mult Programa', 'Ciclo']
+                for col in cols_id_posibles:
+                    if col in X.columns and col not in self.columnas_modelo:
+                        columnas_a_eliminar.append(col)
+                        print(f"   ℹ️ Eliminando '{col}' (no está en modelo)")
+                    elif col in X.columns and col in self.columnas_modelo:
+                        print(f"   ✓ Manteniendo '{col}' (requerida por modelo)")
             
             if columnas_a_eliminar:
                 X = X.drop(columns=columnas_a_eliminar, errors='ignore')
-                print(f"   ✓ {len(columnas_a_eliminar)} columnas eliminadas")
+                print(f"   ✓ Total eliminadas: {len(columnas_a_eliminar)} columnas")
             
             # 2. Eliminar columnas no numéricas
             cols_object = X.select_dtypes(include=['object']).columns.tolist()
