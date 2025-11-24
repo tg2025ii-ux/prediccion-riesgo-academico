@@ -533,7 +533,7 @@ class DataProcessorAjustes:
         
         # ⚠️ ELIMINAR COLUMNA EDAD
         data = data.drop(columns=['Edad'])
-        data = data.drop(columns=['desercion'])
+        #data = data.drop(columns=['desercion'])
         print("   ✓ Columna 'Edad' eliminada (ya no es necesaria)")
         
         return data
