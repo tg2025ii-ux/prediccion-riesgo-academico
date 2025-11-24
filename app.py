@@ -907,33 +907,58 @@ elif menu == "📊 Resultados":
                     )
                 
                 with col3:
-                    # Buscar por ID
+                    # Buscar por índice
                     search_index = st.text_input(
                         "Buscar por Índice",
                         placeholder="Ej: 0, 5, 10",
-                        help="Busca estudiantes por su número de fila"
+                        help="Busca estudiantes por su número de fila (0, 1, 2, ...)"
                     )
                 
                 # Aplicar filtros
                 df_filtered = df.copy()
                 
+                # AGREGAR COLUMNA DE ÍNDICE PRIMERO
+                df_filtered = df_filtered.reset_index(drop=True)
+                df_filtered.insert(0, 'Índice', df_filtered.index)
+                
+                # Filtro por nivel de riesgo
                 if filter_risk:
                     df_filtered = df_filtered[df_filtered['nivel_riesgo'].isin(filter_risk)]
                 
+                # Filtro por rango de probabilidad
                 df_filtered = df_filtered[
                     (df_filtered['probabilidad'] >= prob_range[0]) &
                     (df_filtered['probabilidad'] <= prob_range[1])
                 ]
                 
+                # Filtro por índice
                 if search_index:
-                    if 'Index' in df_filtered.columns:
-                        df_filtered = df_filtered[df_filtered['Index'].astype(str).str.contains(search_index, na=False)]
+                    try:
+                        # Permitir búsqueda de múltiples índices separados por coma
+                        indices_str = [idx.strip() for idx in search_index.split(',')]
+                        indices = []
+                        
+                        for idx_str in indices_str:
+                            if idx_str.isdigit():
+                                indices.append(int(idx_str))
+                        
+                        if indices:
+                            # Filtrar por los índices especificados
+                            df_filtered = df_filtered[df_filtered['Índice'].isin(indices)]
+                            
+                            if len(df_filtered) == 0:
+                                st.warning(f"⚠️ No se encontraron registros con índice(s): {', '.join(map(str, indices))}")
+                        else:
+                            st.warning("⚠️ Formato incorrecto. Usa números separados por coma (Ej: 0, 5, 10)")
+                    
+                    except ValueError:
+                        st.warning("⚠️ Error al procesar los índices. Usa solo números (Ej: 0, 5, 10)")
                 
                 st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
                 
                 # Seleccionar columnas a mostrar
-                columnas_disponibles = ['Benef. Beca', 'Mult Programa', 'Ciclo', 'Sexo', 'rango_edad', 
-                                       'Promedio Acumulado', 'Situacion Acad', 
+                columnas_disponibles = ['Índice', 'Benef. Beca', 'Mult Programa', 'Ciclo', 'Sexo', 
+                                       'rango_edad', 'Promedio Acumulado', 'Situacion Acad', 
                                        'probabilidad', 'nivel_riesgo']
                 
                 display_columns = [c for c in columnas_disponibles if c in df_filtered.columns]
@@ -961,12 +986,22 @@ elif menu == "📊 Resultados":
                     if 'Sexo' in df_display.columns:
                         df_display['Sexo'] = df_display['Sexo'].map({1: 'M', 0: 'F'})
                     
+                    # Formatear Benef. Beca
+                    if 'Benef. Beca' in df_display.columns:
+                        df_display['Benef. Beca'] = df_display['Benef. Beca'].map({1: 'Sí', 0: 'No'})
+                    
                     # Mostrar tabla
                     st.dataframe(
                         df_display,
                         use_container_width=True,
                         height=400
                     )
+                    
+                    # Tip de ayuda
+                    st.caption("""
+                    💡 **Tip:** Puedes buscar múltiples estudiantes separando los índices con coma. 
+                    Ejemplo: `0, 5, 10, 15` mostrará solo esos 4 estudiantes.
+                    """)
                 else:
                     st.warning("⚠️ No hay columnas disponibles para mostrar")
             
