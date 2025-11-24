@@ -276,7 +276,53 @@ if menu == "🏠 Inicio":
 
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
+    st.markdown("### ⚙️ Cómo usar esta herramienta")
     
+    steps = """
+    1. **📤 Ve a "Cargar Datos"** en el menú lateral
+    2. **📂 Sube tu archivo Excel** con las 4 hojas (NOTAS, PER, PROM, ADM)
+    3. **🚀 Click en "PROCESAR Y PREDECIR"** (automático: limpieza → encoding → ajustes → predicción)
+    4. **📊 Ve a "Resultados"** para ver el dashboard interactivo
+    5. **💾 Descarga** los resultados en Excel o CSV
+    """
+    
+    st.info(steps)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🎯 Niveles de Riesgo")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div class='metric-card risk-low'>
+            <h4>🟢 Riesgo Bajo</h4>
+            <p><b>Probabilidad < 30%</b></p>
+            <p>Estudiante con desempeño satisfactorio. Continuar con seguimiento regular.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class='metric-card risk-medium'>
+            <h4>🟡 Riesgo Medio</h4>
+            <p><b>Probabilidad 30-60%</b></p>
+            <p>Requiere atención. Considerar tutorías o acompañamiento académico.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class='metric-card risk-high'>
+            <h4>🔴 Riesgo Alto</h4>
+            <p><b>Probabilidad > 60%</b></p>
+            <p>Requiere intervención inmediata. Apoyo prioritario necesario.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+elif menu == "📤 Cargar Datos":
+    st.title("📤 Cargar Bases de Datos de la Universidad")
     # Instrucciones
     st.markdown(f"""
     <div style='padding: 1.5rem; background-color: #FFF9C4; border-radius: 10px; border-left: 4px solid {COLORS['warning']}; margin-bottom: 2rem;'>
@@ -357,15 +403,15 @@ elif menu == "📤 Cargar Datos":
             
             # Botón de procesamiento
             st.markdown("---")
-            st.markdown("### 🚀 Procesar Datos")
+            st.markdown("### 🚀 Procesar y Predecir")
             
             st.info("""
-            **El procesamiento incluye 4 pasos:**
+            **El sistema ejecutará automáticamente 4 pasos:**
             
             1. 🧹 **Limpieza** (10 fases): Consolidación, filtros, merge de bases
             2. 🎨 **Encoding** (11 fases): Dumificación, transformaciones
             3. 🔧 **Ajustes** (12 fases): Dropout corrida, columnas finales
-            4. 🤖 **Predicción**: Modelo XGBoost ejecuta predicciones
+            4. 🤖 **Predicción XGBoost**: Probabilidades de deserción usando el modelo entrenado
             
             ⏱️ **Tiempo estimado:** 30-60 segundos según tamaño de datos
             """)
@@ -377,15 +423,19 @@ elif menu == "📤 Cargar Datos":
                     try:
                         st.markdown("---")
                         
-                        # Contenedor para logs
+                        # Contenedor para el proceso
                         with st.container():
+                            # ============================================================
+                            # PASO 1-3: PIPELINE INTEGRADO (Limpieza + Encoding + Ajustes)
+                            # ============================================================
+                            
                             st.markdown(f"""
                             <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']};'>
-                                <h4 style='color: {COLORS['text']}; margin: 0;'>⏳ Procesando datos...</h4>
+                                <h4 style='color: {COLORS['text']}; margin: 0;'>⏳ Procesando datos (Limpieza → Encoding → Ajustes)...</h4>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # Ejecutar pipeline con barra de progreso
+                            # Ejecutar pipeline integrado con barra de progreso
                             data_procesada = ejecutar_pipeline_streamlit(
                                 dfs['NOTAS'],
                                 dfs['PER'],
@@ -395,46 +445,58 @@ elif menu == "📤 Cargar Datos":
                             
                             st.success("✅ Pipeline completado!")
                             
-                            # Ahora ejecutar predicción XGBoost
+                            # Mostrar info de datos procesados
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("📝 Registros", f"{len(data_procesada):,}")
+                            with col2:
+                                st.metric("📊 Columnas", f"{len(data_procesada.columns)}")
+                            with col3:
+                                if 'desercion' in data_procesada.columns:
+                                    st.metric("⚠️ Con deserción", f"{(data_procesada['desercion']==1).sum():,}")
+                            
+                            # ============================================================
+                            # PASO 4: PREDICCIÓN CON XGBOOST
+                            # ============================================================
+                            
+                            st.markdown("---")
                             st.markdown(f"""
                             <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']}; margin-top: 1rem;'>
-                                <h4 style='color: {COLORS['text']}; margin: 0;'>🤖 Ejecutando modelo XGBoost...</h4>
+                                <h4 style='color: {COLORS['text']}; margin: 0;'>🤖 Ejecutando predicción con XGBoost...</h4>
+                                <p style='color: {COLORS['text']}; margin-top: 0.5rem; margin-bottom: 0;'>Usando modelo: xgboost_modelo.pkl</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
                             with st.spinner("🤖 Generando predicciones..."):
-                                # Ejecutar predicción con el procesador
-                                resultados = processor.predict(data_procesada)
-                                
-                                # Guardar en session_state
-                                st.session_state['resultados'] = resultados
-                                st.session_state['data_procesada'] = data_procesada
-                                st.session_state['archivo_cargado'] = uploaded_file.name
+                                # AQUÍ SE USA xgboost_modelo.pkl
+                                resultados = processor.predecir_procesado(data_procesada)
                                 
                                 st.success("✅ ¡Predicción completada!")
                                 st.balloons()
                             
-                            # Mostrar resumen
-                            st.markdown("---")
-                            st.markdown("### 📊 Resumen del Procesamiento")
+                            # Guardar en session_state
+                            st.session_state['processed_data'] = resultados
+                            st.session_state['resultados'] = resultados
+                            st.session_state['data_procesada'] = data_procesada
+                            st.session_state['archivo_cargado'] = uploaded_file.name
+                            st.session_state['upload_time'] = datetime.now()
                             
-                            col1, col2, col3 = st.columns(3)
+                            # ============================================================
+                            # RESUMEN DE RESULTADOS
+                            # ============================================================
+                            
+                            st.markdown("---")
+                            st.markdown("### 📊 Resumen de Resultados")
+                            
+                            col1, col2, col3, col4 = st.columns(4)
                             
                             with col1:
                                 st.metric(
-                                    "📝 Estudiantes Analizados",
+                                    "📝 Estudiantes",
                                     f"{len(resultados):,}"
                                 )
                             
                             with col2:
-                                if 'probabilidad' in resultados.columns:
-                                    riesgo_alto = (resultados['probabilidad'] > 0.6).sum()
-                                    st.metric(
-                                        "🔴 Riesgo Alto",
-                                        f"{riesgo_alto:,}"
-                                    )
-                            
-                            with col3:
                                 if 'probabilidad' in resultados.columns:
                                     prob_promedio = resultados['probabilidad'].mean()
                                     st.metric(
@@ -442,26 +504,86 @@ elif menu == "📤 Cargar Datos":
                                         f"{prob_promedio:.1%}"
                                     )
                             
-                            # Mensaje de éxito
+                            with col3:
+                                if 'nivel_riesgo' in resultados.columns:
+                                    riesgo_alto = (resultados['nivel_riesgo'] == 'Alto').sum()
+                                    st.metric(
+                                        "🔴 Riesgo Alto",
+                                        f"{riesgo_alto:,}",
+                                        delta=f"{(riesgo_alto/len(resultados)*100):.1f}%"
+                                    )
+                            
+                            with col4:
+                                if 'nivel_riesgo' in resultados.columns:
+                                    riesgo_bajo = (resultados['nivel_riesgo'] == 'Bajo').sum()
+                                    st.metric(
+                                        "🟢 Riesgo Bajo",
+                                        f"{riesgo_bajo:,}",
+                                        delta=f"{(riesgo_bajo/len(resultados)*100):.1f}%"
+                                    )
+                            
+                            # Gráfico rápido de distribución
+                            if 'nivel_riesgo' in resultados.columns:
+                                st.markdown("---")
+                                st.markdown("#### 📈 Distribución de Riesgo")
+                                
+                                import plotly.graph_objects as go
+                                
+                                distribucion = resultados['nivel_riesgo'].value_counts()
+                                
+                                fig = go.Figure(data=[
+                                    go.Bar(
+                                        x=distribucion.index,
+                                        y=distribucion.values,
+                                        marker_color=['#4CAF50', '#FFC107', '#F44336'],
+                                        text=distribucion.values,
+                                        textposition='auto',
+                                    )
+                                ])
+                                
+                                fig.update_layout(
+                                    title="Cantidad de Estudiantes por Nivel de Riesgo",
+                                    xaxis_title="Nivel de Riesgo",
+                                    yaxis_title="Cantidad de Estudiantes",
+                                    height=400,
+                                    showlegend=False
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Mensaje final
                             st.markdown("---")
                             
                             st.success("""
                             ✅ **¡Proceso completado exitosamente!**
                             
-                            Ve a la sección **📊 Resultados** en el menú lateral para ver el análisis completo.
-                            """)
+                            **Próximos pasos:**
+                            1. Ve a la sección **📊 Resultados** en el menú lateral
+                            2. Explora el dashboard interactivo con gráficos y análisis
+                            3. Descarga los resultados en Excel o CSV
+                            
+                            El modelo XGBoost ha analizado {count:,} estudiantes y calculado sus probabilidades de deserción.
+                            """.format(count=len(resultados)))
                     
                     except Exception as e:
                         st.error(f"❌ Error durante el procesamiento: {str(e)}")
-                        st.exception(e)
+                        
+                        with st.expander("🔍 Ver detalles del error (para debugging)"):
+                            import traceback
+                            st.code(traceback.format_exc())
                         
                         st.warning("""
                         **Posibles causas del error:**
-                        - Datos faltantes en columnas requeridas
-                        - Formato incorrecto en alguna hoja
-                        - Valores inesperados en variables clave
                         
-                        Revisa los logs anteriores para más detalles.
+                        1. **Datos faltantes**: Verifica que todas las hojas tengan las columnas requeridas
+                        2. **Formato incorrecto**: Asegúrate de que los datos estén en el formato esperado
+                        3. **Modelo no cargado**: Verifica que `xgboost_modelo.pkl` esté en la raíz del proyecto
+                        4. **Archivos de configuración**: Verifica que `Libro1.xlsx` y `columnas.csv` existan
+                        
+                        **Soluciones:**
+                        - Revisa los logs en la consola
+                        - Verifica que todos los archivos necesarios estén en el repositorio
+                        - Contacta al administrador si el problema persiste
                         """)
     
     else:
@@ -469,19 +591,12 @@ elif menu == "📤 Cargar Datos":
         st.info("""
         👆 **Sube tu archivo Excel para comenzar**
         
-        El sistema procesará automáticamente los datos y ejecutará el modelo de predicción.
+        El sistema procesará automáticamente:
+        - Limpieza de datos
+        - Encoding de variables
+        - Ajustes finales
+        - Predicción con modelo XGBoost
         """)
-        
-        # Ejemplo visual
-        st.markdown("---")
-        st.markdown("### 📋 Ejemplo de Estructura del Archivo")
-        
-        st.image("https://via.placeholder.com/800x400/3A4A3D/FFFFFF?text=Estructura+del+Excel:+4+hojas+(NOTAS,+PER,+PROM,+ADM)", 
-                 use_container_width=True,
-                 caption="El archivo Excel debe contener exactamente estas 4 hojas")
-
-# SECCIÓN PARA REEMPLAZAR EN APP.PY - RESULTADOS
-
 elif menu == "📊 Resultados":
     st.title("📊 Resultados del Análisis Predictivo")
     
