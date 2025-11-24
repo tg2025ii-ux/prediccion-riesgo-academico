@@ -908,10 +908,10 @@ elif menu == "📊 Resultados":
                 
                 with col3:
                     # Buscar por ID
-                    search_id = st.text_input(
-                        "Buscar por ID",
-                        placeholder="Ej: 123456",
-                        help="Busca un estudiante específico por ID"
+                    search_index = st.text_input(
+                        "Buscar por Índice",
+                        placeholder="Ej: 0, 5, 10",
+                        help="Busca estudiantes por su número de fila"
                     )
                 
                 # Aplicar filtros
