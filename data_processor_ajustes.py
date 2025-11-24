@@ -289,95 +289,227 @@ class DataProcessorAjustes:
         
         return data
     
-  # ============================================================================
-    # FASE 5: CREAR ESTADO_NEXT Y ELIMINAR DESERCION
-    # ============================================================================
-    
-    def _crear_estado_next(self, data):
+def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
         """
-        Crear variable Estado_next (predicción del próximo ciclo)
-        y eliminar la columna 'desercion' del dataset
+        Realiza predicciones con datos YA PROCESADOS por el pipeline integrado
+        
+        Args:
+            data_procesada: DataFrame ya procesado (limpieza + encoding + ajustes)
+            
+        Returns:
+            DataFrame con columnas adicionales:
+            - probabilidad: Probabilidad de deserción (0-1)
+            - nivel_riesgo: Nivel de riesgo ("Bajo", "Medio", "Alto")
         """
-        print("\n🎯 Creando Estado_next...")
+        print("\n" + "="*80)
+        print("🎯 INICIANDO PREDICCIÓN CON DATOS PROCESADOS")
+        print("="*80)
+        print(f"   📊 Registros recibidos: {len(data_procesada):,}")
+        print(f"   📊 Columnas recibidas: {len(data_procesada.columns)}")
         
-        cols_p = [c for c in data.columns if c.startswith('p_')]
-        data['Estado_next'] = 0
-        data = data.sort_values(['ID', 'Mult Programa', 'Ciclo']).reset_index(drop=True)
+        # Verificar que el modelo esté cargado
+        if self.modelo is None:
+            raise ValueError(
+                "❌ Modelo XGBoost no cargado.\n"
+                "   Verifica que 'xgboost_modelo.pkl' esté en la raíz del proyecto."
+            )
         
-        for col_p in cols_p:
-            sub = data[data[col_p] == 1]
-            for (id_val, mp_val), group in sub.groupby(['ID', 'Mult Programa']):
-                ciclos_grupo = group['Ciclo'].to_list()
+        print(f"   ✅ Modelo cargado: {type(self.modelo).__name__}")
+        
+        try:
+            # ============================================================
+            # PREPARACIÓN DE DATOS
+            # ============================================================
+            
+            X = data_procesada.copy()
+            
+            print("\n🔧 Preparando datos para predicción...")
+            
+            # DEBUG: Mostrar primeras columnas
+            print(f"\n🔍 DEBUG - Primeras 20 columnas:")
+            print(f"   {list(X.columns[:20])}")
+            
+            # 1. Eliminar columnas problemáticas PRIMERO
+            print("\n🗑️ Eliminando columnas problemáticas...")
+            
+            columnas_a_eliminar = []
+            
+            # Buscar desercion/deserción
+            for col in X.columns:
+                col_lower = col.lower()
+                if 'desercion' in col_lower or 'deserción' in col_lower:
+                    columnas_a_eliminar.append(col)
+                    print(f"   ❌ Encontrada columna de deserción: '{col}'")
+            
+            # Buscar Estado (Dropout) - ya no se necesita
+            for col in X.columns:
+                if col == 'Estado (Dropout)' or col == 'Estado_Dropout':
+                    columnas_a_eliminar.append(col)
+                    print(f"   ❌ Encontrada columna Estado Dropout: '{col}'")
+            
+            # Eliminar columnas identificadoras
+            cols_id = ['ID', 'Mult Programa', 'Ciclo']
+            for col in cols_id:
+                if col in X.columns:
+                    columnas_a_eliminar.append(col)
+                    print(f"   ℹ️ Eliminando columna identificadora: '{col}'")
+            
+            if columnas_a_eliminar:
+                X = X.drop(columns=columnas_a_eliminar, errors='ignore')
+                print(f"   ✓ {len(columnas_a_eliminar)} columnas eliminadas")
+            
+            print(f"   📊 Columnas después de limpieza: {len(X.columns)}")
+            
+            # 2. Eliminar columnas no numéricas
+            cols_object = X.select_dtypes(include=['object']).columns.tolist()
+            if cols_object:
+                print(f"   → Eliminando {len(cols_object)} columnas no numéricas: {cols_object[:5]}...")
+                X = X.drop(columns=cols_object)
+            
+            # 3. Eliminar columnas duplicadas
+            if X.columns.duplicated().any():
+                duplicados = X.columns[X.columns.duplicated()].tolist()
+                print(f"   → Eliminando {len(duplicados)} columnas duplicadas: {duplicados[:5]}...")
+                X = X.loc[:, ~X.columns.duplicated()]
+            
+            # 4. Manejar valores infinitos
+            X = X.replace([np.inf, -np.inf], np.nan)
+            
+            # 5. Rellenar NaN con 0
+            if X.isnull().any().any():
+                nulos_count = X.isnull().sum().sum()
+                print(f"   → Rellenando {nulos_count:,} valores NaN con 0")
+                X = X.fillna(0)
+            
+            print(f"\n   📊 Columnas antes de alinear con modelo: {len(X.columns)}")
+            
+            # 6. Alinear con columnas del modelo (si existen)
+            if self.columnas_modelo is not None:
+                print(f"   → Alineando con columnas del modelo ({len(self.columnas_modelo)} columnas esperadas)")
                 
-                if len(ciclos_grupo) == 0:
-                    continue
+                # DEBUG: Mostrar diferencias
+                cols_actuales = set(X.columns)
+                cols_esperadas = set(self.columnas_modelo)
                 
-                # 1. Dos ciclos de mayor valor → NaN
-                top2_cycles = sorted(ciclos_grupo)[-2:] if len(ciclos_grupo) >= 2 else [max(ciclos_grupo)]
-                for ciclo_top in top2_cycles:
-                    idx_top = group[group['Ciclo'] == ciclo_top].index[0]
-                    data.loc[idx_top, 'Estado_next'] = np.nan
+                cols_faltantes = cols_esperadas - cols_actuales
+                cols_extra = cols_actuales - cols_esperadas
                 
-                max_cycle = max(top2_cycles)
-                
-                # 2. Si último tiene Dropout=1, marcar dos ciclos antes
-                if data.loc[idx_top, 'Estado (Dropout)'] == 1:
-                    ciclos_ordenados = sorted(ciclos_grupo)
-                    pos_desercion = ciclos_ordenados.index(max_cycle)
+                if cols_extra:
+                    print(f"\n   ⚠️ COLUMNAS EXTRA encontradas ({len(cols_extra)}):")
+                    for col in list(cols_extra)[:10]:
+                        print(f"      • {col}")
+                    if len(cols_extra) > 10:
+                        print(f"      ... y {len(cols_extra)-10} más")
                     
-                    if pos_desercion >= 2:
-                        ciclo_target = ciclos_ordenados[pos_desercion - 2]
-                        idx_target = group[group['Ciclo'] == ciclo_target].index[0]
-                        data.loc[idx_target, 'Estado_next'] = 1
-                    else:
-                        anteriores = [c for c in ciclos_grupo if c < max_cycle]
-                        if len(anteriores) > 0:
-                            ciclo_target = max(anteriores)
-                            idx_prev = group[group['Ciclo'] == ciclo_target].index[0]
-                            data.loc[idx_prev, 'Estado_next'] = 1
+                    # Eliminar columnas extra
+                    X = X.drop(columns=list(cols_extra))
+                    print(f"   ✓ Columnas extra eliminadas")
                 
-                # 3. Pausas en ciclos menores
-                for i, ciclo in enumerate(ciclos_grupo):
-                    idx = group[group['Ciclo'] == ciclo].index[0]
-                    if ciclo < max_cycle and data.loc[idx, 'Estado (Dropout)'] == 1:
-                        data.loc[idx, 'Estado_next'] = 1
-        
-        # Marcar penúltimo ciclo como 0
-        data["Ciclo"] = data["Ciclo"].astype(int)
-        ciclos_unicos = sorted(data['Ciclo'].unique())
-        
-        if len(ciclos_unicos) >= 2:
-            penultimo_ciclo = ciclos_unicos[-2]
-            data.loc[data['Ciclo'] == penultimo_ciclo, 'Estado_next'] = 0
-            print(f"   ✓ Penúltimo ciclo ({penultimo_ciclo}) marcado como 0")
-        
-        print(f"   ✓ Estado_next creado")
-        
-        # ============================================================================
-        # ELIMINAR COLUMNA 'desercion'
-        # ============================================================================
-        
-        print("\n🗑️ Eliminando columna 'desercion'...")
-        
-        # Buscar todas las variantes posibles de la columna desercion
-        columnas_a_eliminar = []
-        
-        for col in data.columns:
-            col_lower = col.lower()
-            if 'desercion' in col_lower or 'deserción' in col_lower:
-                columnas_a_eliminar.append(col)
-        
-        if columnas_a_eliminar:
-            print(f"   → Columnas encontradas: {columnas_a_eliminar}")
-            data = data.drop(columns=columnas_a_eliminar)
-            print(f"   ✓ {len(columnas_a_eliminar)} columna(s) eliminada(s)")
-        else:
-            print("   ℹ️ No se encontró columna 'desercion' en el dataset")
-        
-        print(f"   ✓ Dataset final: {len(data)} registros, {len(data.columns)} columnas")
-        
-        return data
-    
+                if cols_faltantes:
+                    print(f"\n   ℹ️ Columnas faltantes ({len(cols_faltantes)}):")
+                    for col in list(cols_faltantes)[:10]:
+                        print(f"      • {col}")
+                    if len(cols_faltantes) > 10:
+                        print(f"      ... y {len(cols_faltantes)-10} más")
+                    
+                    # Agregar columnas faltantes con 0
+                    for col in cols_faltantes:
+                        X[col] = 0
+                    print(f"   ✓ Columnas faltantes agregadas con 0")
+                
+                # Ordenar según modelo
+                X = X[self.columnas_modelo]
+                print(f"   ✓ Columnas ordenadas según modelo")
+            
+            print(f"\n   ✅ Datos preparados: {X.shape}")
+            print(f"      Columnas finales: {len(X.columns)}")
+            print(f"      Modelo espera: {len(self.columnas_modelo) if self.columnas_modelo else 'N/A'}")
+            
+            # Verificación final
+            if self.columnas_modelo and len(X.columns) != len(self.columnas_modelo):
+                print(f"\n   ⚠️ ERROR: Mismatch de columnas!")
+                print(f"      Tenemos: {len(X.columns)}")
+                print(f"      Esperamos: {len(self.columnas_modelo)}")
+                raise ValueError(f"Feature mismatch: tenemos {len(X.columns)}, esperamos {len(self.columnas_modelo)}")
+            
+            # ============================================================
+            # APLICAR SCALER (si existe)
+            # ============================================================
+            
+            if self.scaler is not None:
+                print("\n   🔧 Aplicando scaler (estandarización)...")
+                X_scaled = self.scaler.transform(X)
+            else:
+                print("\n   ℹ️ No hay scaler, usando datos sin estandarizar")
+                X_scaled = X.values
+            
+            # ============================================================
+            # PREDICCIÓN CON xgboost_modelo.pkl
+            # ============================================================
+            
+            print("\n🤖 Ejecutando predicción con XGBoost...")
+            
+            # Detectar tipo de modelo
+            modelo_tipo = type(self.modelo).__name__
+            print(f"   Tipo de modelo: {modelo_tipo}")
+            
+            if 'ExponentiatedGradient' in modelo_tipo:
+                # Modelo con mitigación de sesgo
+                print("   ℹ️ Modelo con mitigación de sesgo detectado")
+                predicciones = self.modelo.predict(X_scaled)
+                probabilidades = np.where(predicciones == 1, 0.9, 0.1)
+            else:
+                # Modelo estándar (XGBoost, RandomForest, etc.)
+                if hasattr(self.modelo, 'predict_proba'):
+                    probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
+                else:
+                    # Fallback si no tiene predict_proba
+                    predicciones = self.modelo.predict(X_scaled)
+                    probabilidades = predicciones.astype(float)
+            
+            print(f"   ✅ Predicciones generadas: {len(probabilidades):,}")
+            
+            # ============================================================
+            # AGREGAR RESULTADOS AL DATAFRAME
+            # ============================================================
+            
+            resultado = data_procesada.copy()
+            resultado['probabilidad'] = probabilidades
+            
+            # Clasificar nivel de riesgo
+            resultado['nivel_riesgo'] = pd.cut(
+                probabilidades,
+                bins=[0, 0.3, 0.6, 1.0],
+                labels=["Bajo", "Medio", "Alto"]
+            )
+            
+            # ============================================================
+            # ESTADÍSTICAS FINALES
+            # ============================================================
+            
+            print("\n" + "="*80)
+            print("✅ PREDICCIÓN COMPLETADA")
+            print("="*80)
+            print(f"   📊 Estudiantes analizados: {len(resultado):,}")
+            print(f"   📊 Probabilidad promedio: {probabilidades.mean():.2%}")
+            print(f"   📊 Probabilidad mínima: {probabilidades.min():.2%}")
+            print(f"   📊 Probabilidad máxima: {probabilidades.max():.2%}")
+            print("\n   📈 Distribución de riesgo:")
+            print(f"      🟢 Bajo (<30%):   {(resultado['nivel_riesgo']=='Bajo').sum():>6,} estudiantes")
+            print(f"      🟡 Medio (30-60%): {(resultado['nivel_riesgo']=='Medio').sum():>6,} estudiantes")
+            print(f"      🔴 Alto (>60%):    {(resultado['nivel_riesgo']=='Alto').sum():>6,} estudiantes")
+            print("="*80 + "\n")
+            
+            return resultado
+            
+        except Exception as e:
+            print(f"\n❌ ERROR EN PREDICCIÓN: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+
+
     # ============================================================================
     # FASE 6: VALIDAR CON PER
     # ============================================================================
