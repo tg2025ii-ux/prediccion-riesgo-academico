@@ -410,7 +410,6 @@ class DataProcessorAjustes:
         # Renombres
         renombres = {
             'Créditos Inscritos en Ciclo_prom': 'Créditos Inscritos en Ciclo',
-            'Créd.Inscritos y Aprobados Ciclo_prom': 'Créditos Inscritos y Aprobados Ciclo'
         }
         
         data = data.rename(columns={k: v for k, v in renombres.items() if k in data.columns})
@@ -418,7 +417,6 @@ class DataProcessorAjustes:
         # Eliminar columnas
         columnas_eliminar = [
             'Créditos Inscritos en Ciclo_per',
-            'Créd.Inscritos y Aprobados Ciclo_per',
             'Situacion Acad',
             'Créd Inscritos xa PromedioCicl',
             'Créd.Inscrtos Aprbdos PromCicl',
