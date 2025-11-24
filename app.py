@@ -369,7 +369,7 @@ elif menu == "📤 Cargar Datos":
                             # ============================================================
                             
                             st.markdown(f"""
-                            <div style='padding: 1rem; background-color: {COLORS['3A4A3D']}; border-radius: 10px; border-left: 4px solid {COLORS['3A4A3D']};'>
+                            <div style='padding: 1rem; background-color: {COLORS['danger']}; border-radius: 10px; border-left: 4px solid {COLORS['danger']};'>
                                 <h4 style='color: {COLORS['danger']}; margin: 0;'>⏳ Procesando datos (Limpieza → Encoding → Ajustes)...</h4>
                             </div>
                             """, unsafe_allow_html=True)
