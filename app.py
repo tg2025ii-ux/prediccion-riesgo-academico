@@ -288,8 +288,6 @@ Reemplaza la sección correspondiente en tu app.py
 # Agregar este import al inicio del archivo
 from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
 
-# Luego, en el menú donde dice: elif menu == "📤 Cargar Datos":
-# REEMPLAZAR TODO con esto:
 
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
