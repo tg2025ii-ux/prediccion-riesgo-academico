@@ -548,422 +548,506 @@ elif menu == "📊 Resultados":
         """, unsafe_allow_html=True)
     else:
         df = st.session_state['processed_data']
-        data_original = st.session_state.get('data_original', {})
         
-        # Importar procesador para estadísticas
-        from data_processor_xgboost import DataProcessorXGBoost
-        processor = DataProcessorXGBoost(model_dir='models')
-        stats = processor.get_summary_stats(df)
-        
-        # TABS para organizar resultados
-        tab1, tab2, tab3 = st.tabs([
-            "📈 Datos Ingresados", 
-            "🎯 Predicciones de Deserción",
-            "📋 Tabla Detallada"
-        ])
-        
-        # ====================================================================
-        # TAB 1: ESTADÍSTICAS DESCRIPTIVAS DE LOS DATOS INGRESADOS
-        # ====================================================================
-        with tab1:
-            st.markdown("### 📊 Características de los Datos Ingresados")
+        # Verificar que tiene las columnas necesarias
+        if 'probabilidad' not in df.columns or 'nivel_riesgo' not in df.columns:
+            st.error("❌ Los datos no tienen predicciones. Vuelve a procesar los datos.")
+        else:
+            # ====================================================================
+            # MÉTRICAS PRINCIPALES
+            # ====================================================================
+            st.markdown("### 📊 Resumen General")
             
-            st.info("""
-            Esta sección muestra estadísticas descriptivas de los datos que cargaste 
-            desde las bases NOTAS, PER, PROM y ADM **antes** de hacer las predicciones.
-            """)
-            
-            # Métricas generales
             col1, col2, col3, col4 = st.columns(4)
+            
+            total = len(df)
+            prob_promedio = df['probabilidad'].mean()
+            riesgo_alto = (df['nivel_riesgo'] == 'Alto').sum()
+            riesgo_bajo = (df['nivel_riesgo'] == 'Bajo').sum()
             
             with col1:
                 st.metric(
                     "👥 Total Estudiantes",
-                    f"{stats['total_estudiantes']:,}",
-                    help="Total de estudiantes procesados"
+                    f"{total:,}",
+                    help="Total de estudiantes analizados"
                 )
             
             with col2:
-                if 'per' in data_original and 'Programa' in data_original['per'].columns:
-                    n_programas = data_original['per']['Programa'].nunique()
-                    st.metric("🎓 Programas", n_programas)
-            
-            with col3:
-                if 'prom' in data_original and 'Promedio Acumulado' in data_original['prom'].columns:
-                    prom_gral = data_original['prom']['Promedio Acumulado'].mean()
-                    st.metric("📚 Promedio General", f"{prom_gral:.2f}")
-            
-            with col4:
-                if 'per' in data_original and 'Ciclo' in data_original['per'].columns:
-                    ciclos = data_original['per']['Ciclo'].nunique()
-                    st.metric("📅 Ciclos", ciclos)
-            
-            st.markdown("---")
-            
-            # Gráficas descriptivas
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Distribución por Sexo
-                if 'per' in data_original and 'Sexo' in data_original['per'].columns:
-                    st.markdown("#### 👫 Distribución por Sexo")
-                    fig = px.pie(
-                        data_original['per'], 
-                        names='Sexo',
-                        title='Distribución por Sexo',
-                        color_discrete_sequence=[COLORS['primary'], COLORS['secondary']]
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Distribución de Edad
-                if 'per' in data_original and 'Edad' in data_original['per'].columns:
-                    st.markdown("#### 📊 Distribución de Edad")
-                    fig = px.histogram(
-                        data_original['per'], 
-                        x='Edad',
-                        title='Distribución de Edad',
-                        nbins=30,
-                        color_discrete_sequence=[COLORS['accent']]
-                    )
-                    fig.update_layout(xaxis_title="Edad", yaxis_title="Frecuencia")
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                # Top 10 Programas
-                if 'adm' in data_original and 'Programa Académico' in data_original['adm'].columns:
-                    st.markdown("#### 🎓 Top 10 Programas")
-                    top_prog = data_original['adm']['Programa Académico'].value_counts().head(10)
-                    fig = px.bar(
-                        x=top_prog.values,
-                        y=top_prog.index,
-                        orientation='h',
-                        title='Estudiantes por Programa',
-                        color_discrete_sequence=[COLORS['primary']]
-                    )
-                    fig.update_layout(xaxis_title="Estudiantes", yaxis_title="Programa")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Distribución de Promedios
-                if 'prom' in data_original and 'Promedio Acumulado' in data_original['prom'].columns:
-                    st.markdown("#### 📈 Distribución de Promedios")
-                    fig = px.histogram(
-                        data_original['prom'],
-                        x='Promedio Acumulado',
-                        title='Distribución de Promedios Acumulados',
-                        nbins=30,
-                        color_discrete_sequence=[COLORS['success']]
-                    )
-                    fig.update_layout(xaxis_title="Promedio Acumulado", yaxis_title="Frecuencia")
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            # Estadísticas adicionales
-            st.markdown("---")
-            st.markdown("#### 📋 Resumen Estadístico")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if 'prom' in data_original and 'Promedio Acumulado' in data_original['prom'].columns:
-                    st.markdown("**Promedios Académicos:**")
-                    prom_stats = data_original['prom']['Promedio Acumulado'].describe()
-                    st.dataframe(prom_stats, use_container_width=True)
-            
-            with col2:
-                if 'per' in data_original and 'Edad' in data_original['per'].columns:
-                    st.markdown("**Edad:**")
-                    edad_stats = data_original['per']['Edad'].describe()
-                    st.dataframe(edad_stats, use_container_width=True)
-        
-        # ====================================================================
-        # TAB 2: PREDICCIONES DE DESERCIÓN
-        # ====================================================================
-        with tab2:
-            st.markdown("### 🎯 Resultados de Predicción con XGBoost")
-            
-            # Métricas del modelo
-            st.markdown("#### 🤖 Rendimiento del Modelo")
-            
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.markdown("""
-                **Modelo:** XGBoost con Mitigación de Sesgo  
-                **Variable Protegida:** Beneficio Beca  
-                **Técnica de Mitigación:** Exponentiated Gradient
-                """)
-            
-            with col2:
-                # Mostrar métricas del modelo (de Metricas.txt)
-                metricas_df = pd.DataFrame({
-                    'Métrica': ['Accuracy', 'Precision', 'Recall', 'F1-Score', 'ROC-AUC'],
-                    'Pre-Mitigación': [0.8688, 0.7042, 0.3724, 0.4872, 0.8707],
-                    'Post-Mitigación': [0.8686, 0.6942, 0.3841, 0.4946, 0.8707]
-                })
-                st.dataframe(metricas_df, use_container_width=True, hide_index=True)
-            
-            st.markdown("---")
-            
-            # Métricas de los resultados actuales
-            st.markdown("#### 📊 Resultados de la Predicción")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("👥 Total", f"{stats['total_estudiantes']:,}")
-            
-            with col2:
-                pct_bajo = (stats['riesgo_bajo'] / stats['total_estudiantes'] * 100)
                 st.metric(
-                    "🟢 Riesgo Bajo",
-                    f"{stats['riesgo_bajo']:,}",
-                    f"{pct_bajo:.1f}%"
+                    "📊 Riesgo Promedio",
+                    f"{prob_promedio:.1%}",
+                    help="Probabilidad promedio de deserción"
                 )
             
             with col3:
-                pct_medio = (stats['riesgo_medio'] / stats['total_estudiantes'] * 100)
-                st.metric(
-                    "🟡 Riesgo Medio",
-                    f"{stats['riesgo_medio']:,}",
-                    f"{pct_medio:.1f}%"
-                )
-            
-            with col4:
-                pct_alto = (stats['riesgo_alto'] / stats['total_estudiantes'] * 100)
+                pct_alto = (riesgo_alto / total * 100)
                 st.metric(
                     "🔴 Riesgo Alto",
-                    f"{stats['riesgo_alto']:,}",
+                    f"{riesgo_alto:,}",
                     f"{pct_alto:.1f}%",
-                    delta_color="inverse"
+                    delta_color="inverse",
+                    help="Estudiantes con probabilidad > 60%"
+                )
+            
+            with col4:
+                pct_bajo = (riesgo_bajo / total * 100)
+                st.metric(
+                    "🟢 Riesgo Bajo",
+                    f"{riesgo_bajo:,}",
+                    f"{pct_bajo:.1f}%",
+                    help="Estudiantes con probabilidad < 30%"
                 )
             
             st.markdown("---")
             
-            # Gráficas de predicción
-            col1, col2 = st.columns(2)
+            # ====================================================================
+            # TABS PARA ORGANIZAR CONTENIDO
+            # ====================================================================
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📈 Distribución General",
+                "⚖️ Análisis de Equidad",
+                "📋 Tabla Detallada",
+                "💾 Descargas"
+            ])
             
-            with col1:
-                st.markdown("#### 🎯 Distribución de Riesgo")
+            # ================================================================
+            # TAB 1: DISTRIBUCIÓN GENERAL
+            # ================================================================
+            with tab1:
+                st.markdown("### 📈 Distribución de Riesgo")
                 
-                risk_counts = df['nivel_riesgo'].value_counts()
-                fig = go.Figure(data=[go.Pie(
-                    labels=risk_counts.index,
-                    values=risk_counts.values,
-                    marker=dict(colors=[COLORS['success'], COLORS['warning'], COLORS['danger']]),
-                    hole=0.4
-                )])
-                fig.update_layout(
-                    showlegend=True,
-                    height=400,
-                    margin=dict(t=0, b=0, l=0, r=0)
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Gráfico de pastel
+                    st.markdown("#### 🎯 Distribución por Nivel")
+                    
+                    risk_counts = df['nivel_riesgo'].value_counts()
+                    
+                    fig = go.Figure(data=[go.Pie(
+                        labels=risk_counts.index,
+                        values=risk_counts.values,
+                        marker=dict(colors=['#4CAF50', '#FFC107', '#F44336']),
+                        hole=0.4,
+                        textinfo='label+percent',
+                        textfont=dict(size=14),
+                        hovertemplate='<b>%{label}</b><br>%{value} estudiantes<br>%{percent}<extra></extra>'
+                    )])
+                    
+                    fig.update_layout(
+                        showlegend=True,
+                        height=400,
+                        margin=dict(t=30, b=0, l=0, r=0),
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=-0.2,
+                            xanchor="center",
+                            x=0.5
+                        )
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Gráfico de barras
+                    st.markdown("#### 📊 Cantidad por Nivel")
+                    
+                    fig = go.Figure(data=[
+                        go.Bar(
+                            x=risk_counts.index,
+                            y=risk_counts.values,
+                            marker_color=['#4CAF50', '#FFC107', '#F44336'],
+                            text=risk_counts.values,
+                            textposition='auto',
+                            texttemplate='%{text:,}',
+                            hovertemplate='<b>%{x}</b><br>%{y:,} estudiantes<extra></extra>'
+                        )
+                    ])
+                    
+                    fig.update_layout(
+                        xaxis_title="Nivel de Riesgo",
+                        yaxis_title="Cantidad de Estudiantes",
+                        showlegend=False,
+                        height=400,
+                        margin=dict(t=30, b=0, l=0, r=0)
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # Histograma de probabilidades
                 st.markdown("#### 📊 Distribución de Probabilidades")
                 
-                fig = px.histogram(
-                    df,
-                    x='probabilidad',
-                    nbins=30,
-                    title='Probabilidades de Deserción',
-                    color_discrete_sequence=[COLORS['secondary']]
-                )
+                fig = go.Figure()
+                
+                fig.add_trace(go.Histogram(
+                    x=df['probabilidad'],
+                    nbinsx=30,
+                    marker_color=COLORS['primary'],
+                    opacity=0.7,
+                    name='Probabilidades',
+                    hovertemplate='Probabilidad: %{x:.2%}<br>Frecuencia: %{y}<extra></extra>'
+                ))
+                
+                # Agregar líneas verticales para los umbrales
+                fig.add_vline(x=0.3, line_dash="dash", line_color="green", 
+                             annotation_text="Bajo/Medio (30%)", annotation_position="top")
+                fig.add_vline(x=0.6, line_dash="dash", line_color="red", 
+                             annotation_text="Medio/Alto (60%)", annotation_position="top")
+                
                 fig.update_layout(
+                    xaxis_title="Probabilidad de Deserción",
+                    yaxis_title="Frecuencia",
                     showlegend=False,
                     height=400,
-                    xaxis_title="Probabilidad",
-                    yaxis_title="Frecuencia"
+                    xaxis=dict(tickformat='.0%')
                 )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            st.markdown("---")
-            
-            # Análisis por variables protegidas (Equidad)
-            st.markdown("#### ⚖️ Análisis de Equidad - Variables Protegidas")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Riesgo por Sexo
-                if 'Sexo' in df.columns:
-                    st.markdown("**Probabilidad de Deserción por Sexo**")
-                    
-                    fig = px.box(
-                        df,
-                        x='Sexo',
-                        y='probabilidad',
-                        color='Sexo',
-                        title='Distribución de Probabilidades por Sexo',
-                        color_discrete_sequence=[COLORS['primary'], COLORS['secondary']]
-                    )
-                    fig.update_layout(height=350)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Tabla de promedios
-                    sexo_stats = df.groupby('Sexo')['probabilidad'].agg(['mean', 'count']).reset_index()
-                    sexo_stats.columns = ['Sexo', 'Probabilidad Promedio', 'Cantidad']
-                    sexo_stats['Probabilidad Promedio'] = sexo_stats['Probabilidad Promedio'].apply(lambda x: f"{x:.2%}")
-                    st.dataframe(sexo_stats, use_container_width=True, hide_index=True)
-            
-            with col2:
-                # Riesgo por Beneficiario de Beca
-                if 'Benef. Beca' in df.columns:
-                    st.markdown("**Probabilidad por Beneficiario de Beca**")
-                    
-                    fig = px.box(
-                        df,
-                        x='Benef. Beca',
-                        y='probabilidad',
-                        color='Benef. Beca',
-                        title='Distribución por Beneficiario de Beca',
-                        color_discrete_sequence=[COLORS['accent'], COLORS['warning']]
-                    )
-                    fig.update_layout(height=350)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Tabla de promedios
-                    beca_stats = df.groupby('Benef. Beca')['probabilidad'].agg(['mean', 'count']).reset_index()
-                    beca_stats.columns = ['Beneficiario Beca', 'Probabilidad Promedio', 'Cantidad']
-                    beca_stats['Probabilidad Promedio'] = beca_stats['Probabilidad Promedio'].apply(lambda x: f"{x:.2%}")
-                    st.dataframe(beca_stats, use_container_width=True, hide_index=True)
-            
-            # Riesgo por Programa (Top 10)
-            st.markdown("---")
-            st.markdown("#### 🎓 Riesgo de Deserción por Programa (Top 10)")
-            
-            if 'Programa' in df.columns:
-                prog_risk = df.groupby('Programa').agg({
-                    'probabilidad': 'mean',
-                    'ID': 'count'
-                }).reset_index()
-                prog_risk.columns = ['Programa', 'Probabilidad Promedio', 'Estudiantes']
-                prog_risk = prog_risk.nlargest(10, 'Probabilidad Promedio')
                 
-                fig = px.bar(
-                    prog_risk,
-                    x='Probabilidad Promedio',
-                    y='Programa',
-                    orientation='h',
-                    title='Programas con Mayor Riesgo Promedio',
-                    color='Probabilidad Promedio',
-                    color_continuous_scale=['green', 'yellow', 'red']
-                )
-                fig.update_layout(height=400)
                 st.plotly_chart(fig, use_container_width=True)
-        
-        # ====================================================================
-        # TAB 3: TABLA DETALLADA
-        # ====================================================================
-        with tab3:
-            st.markdown("### 📋 Tabla Detallada de Estudiantes")
-            
-            # Filtros
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                filter_risk = st.multiselect(
-                    "Filtrar por Nivel de Riesgo",
-                    options=["Bajo", "Medio", "Alto"],
-                    default=["Alto"],
-                    help="Selecciona los niveles de riesgo a mostrar"
-                )
-            
-            with col2:
-                if 'Programa' in df.columns:
-                    programas_unicos = sorted(df['Programa'].unique())
-                    filter_programa = st.multiselect(
-                        "Filtrar por Programa",
-                        options=programas_unicos,
-                        help="Filtra por programa académico"
-                    )
-                else:
-                    filter_programa = []
-            
-            with col3:
-                if 'Sexo' in df.columns:
-                    filter_sexo = st.multiselect(
-                        "Filtrar por Sexo",
-                        options=df['Sexo'].unique(),
-                        help="Filtra por sexo"
-                    )
-                else:
-                    filter_sexo = []
-            
-            # Aplicar filtros
-            df_filtered = df.copy()
-            
-            if filter_risk:
-                df_filtered = df_filtered[df_filtered['nivel_riesgo'].isin(filter_risk)]
-            
-            if filter_programa:
-                df_filtered = df_filtered[df_filtered['Programa'].isin(filter_programa)]
-            
-            if filter_sexo:
-                df_filtered = df_filtered[df_filtered['Sexo'].isin(filter_sexo)]
-            
-            st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
-            
-            # Seleccionar columnas a mostrar
-            display_columns = ['ID', 'Programa', 'Ciclo', 'Sexo', 'Promedio Acumulado', 
-                              'probabilidad', 'nivel_riesgo']
-            display_columns = [c for c in display_columns if c in df_filtered.columns]
-            
-            # Crear indicador visual
-            def get_risk_emoji(nivel):
-                if nivel == "Alto":
-                    return "🔴"
-                elif nivel == "Medio":
-                    return "🟡"
-                else:
-                    return "🟢"
-            
-            df_display = df_filtered[display_columns].copy()
-            df_display.insert(0, '🚦', df_display['nivel_riesgo'].apply(get_risk_emoji))
-            
-            # Formatear probabilidad
-            if 'probabilidad' in df_display.columns:
-                df_display['probabilidad'] = df_display['probabilidad'].apply(lambda x: f"{x:.2%}")
-            
-            # Mostrar tabla
-            st.dataframe(
-                df_display,
-                use_container_width=True,
-                height=400
-            )
-            
-            st.markdown("---")
-            
-            # Descargas
-            st.markdown("### 💾 Descargar Resultados")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Excel completo
-                from io import BytesIO
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Resultados')
-                excel_data = output.getvalue()
                 
-                st.download_button(
-                    label="📥 Descargar Excel Completo",
-                    data=excel_data,
-                    file_name=f"Predicciones_XGBoost_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
+                # Estadísticas descriptivas
+                st.markdown("---")
+                st.markdown("#### 📈 Estadísticas Descriptivas")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Mínimo", f"{df['probabilidad'].min():.2%}")
+                
+                with col2:
+                    st.metric("Mediana", f"{df['probabilidad'].median():.2%}")
+                
+                with col3:
+                    st.metric("Promedio", f"{df['probabilidad'].mean():.2%}")
+                
+                with col4:
+                    st.metric("Máximo", f"{df['probabilidad'].max():.2%}")
             
-            with col2:
-                # CSV
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar CSV",
-                    data=csv,
-                    file_name=f"Predicciones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+            # ================================================================
+            # TAB 2: ANÁLISIS DE EQUIDAD
+            # ================================================================
+            with tab2:
+                st.markdown("### ⚖️ Análisis de Equidad")
+                
+                st.info("""
+                Este análisis verifica que el modelo no tenga sesgos significativos 
+                respecto a variables protegidas como **Sexo** o **Beneficiario de Beca**.
+                """)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Análisis por Sexo
+                    if 'Sexo' in df.columns:
+                        st.markdown("#### 👫 Análisis por Sexo")
+                        
+                        # Convertir Sexo a etiquetas legibles
+                        df_temp = df.copy()
+                        df_temp['Sexo_Label'] = df_temp['Sexo'].map({1: 'Masculino', 0: 'Femenino'})
+                        
+                        fig = go.Figure()
+                        
+                        for sexo in df_temp['Sexo_Label'].unique():
+                            if pd.notna(sexo):
+                                datos = df_temp[df_temp['Sexo_Label'] == sexo]['probabilidad']
+                                
+                                fig.add_trace(go.Box(
+                                    y=datos,
+                                    name=sexo,
+                                    boxmean='sd',
+                                    marker_color=COLORS['primary'] if sexo == 'Masculino' else COLORS['secondary'],
+                                    hovertemplate='%{y:.2%}<extra></extra>'
+                                ))
+                        
+                        fig.update_layout(
+                            yaxis_title="Probabilidad de Deserción",
+                            showlegend=True,
+                            height=400,
+                            yaxis=dict(tickformat='.0%')
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Tabla comparativa
+                        sexo_stats = df_temp.groupby('Sexo_Label')['probabilidad'].agg([
+                            ('Promedio', 'mean'),
+                            ('Mediana', 'median'),
+                            ('Desv. Est.', 'std'),
+                            ('Cantidad', 'count')
+                        ]).reset_index()
+                        
+                        sexo_stats['Promedio'] = sexo_stats['Promedio'].apply(lambda x: f"{x:.2%}")
+                        sexo_stats['Mediana'] = sexo_stats['Mediana'].apply(lambda x: f"{x:.2%}")
+                        sexo_stats['Desv. Est.'] = sexo_stats['Desv. Est.'].apply(lambda x: f"{x:.4f}")
+                        sexo_stats['Cantidad'] = sexo_stats['Cantidad'].apply(lambda x: f"{x:,}")
+                        
+                        st.dataframe(sexo_stats, use_container_width=True, hide_index=True)
+                    else:
+                        st.warning("⚠️ La variable 'Sexo' no está disponible en los datos")
+                
+                with col2:
+                    # Análisis por Beca
+                    if 'Benef. Beca' in df.columns:
+                        st.markdown("#### 🎓 Análisis por Beneficiario de Beca")
+                        
+                        df_temp = df.copy()
+                        df_temp['Beca_Label'] = df_temp['Benef. Beca'].map({1: 'Con Beca', 0: 'Sin Beca'})
+                        
+                        fig = go.Figure()
+                        
+                        for beca in df_temp['Beca_Label'].unique():
+                            if pd.notna(beca):
+                                datos = df_temp[df_temp['Beca_Label'] == beca]['probabilidad']
+                                
+                                fig.add_trace(go.Box(
+                                    y=datos,
+                                    name=beca,
+                                    boxmean='sd',
+                                    marker_color=COLORS['accent'] if beca == 'Con Beca' else COLORS['warning'],
+                                    hovertemplate='%{y:.2%}<extra></extra>'
+                                ))
+                        
+                        fig.update_layout(
+                            yaxis_title="Probabilidad de Deserción",
+                            showlegend=True,
+                            height=400,
+                            yaxis=dict(tickformat='.0%')
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Tabla comparativa
+                        beca_stats = df_temp.groupby('Beca_Label')['probabilidad'].agg([
+                            ('Promedio', 'mean'),
+                            ('Mediana', 'median'),
+                            ('Desv. Est.', 'std'),
+                            ('Cantidad', 'count')
+                        ]).reset_index()
+                        
+                        beca_stats['Promedio'] = beca_stats['Promedio'].apply(lambda x: f"{x:.2%}")
+                        beca_stats['Mediana'] = beca_stats['Mediana'].apply(lambda x: f"{x:.2%}")
+                        beca_stats['Desv. Est.'] = beca_stats['Desv. Est.'].apply(lambda x: f"{x:.4f}")
+                        beca_stats['Cantidad'] = beca_stats['Cantidad'].apply(lambda x: f"{x:,}")
+                        
+                        st.dataframe(beca_stats, use_container_width=True, hide_index=True)
+                    else:
+                        st.warning("⚠️ La variable 'Benef. Beca' no está disponible en los datos")
+                
+                st.markdown("---")
+                
+                # Distribución de riesgo por variables protegidas
+                st.markdown("#### 📊 Distribución de Riesgo por Grupos")
+                
+                if 'Sexo' in df.columns:
+                    df_temp = df.copy()
+                    df_temp['Sexo_Label'] = df_temp['Sexo'].map({1: 'Masculino', 0: 'Femenino'})
+                    
+                    sexo_riesgo = pd.crosstab(
+                        df_temp['Sexo_Label'], 
+                        df_temp['nivel_riesgo'],
+                        normalize='index'
+                    ) * 100
+                    
+                    fig = go.Figure()
+                    
+                    colores = {'Bajo': '#4CAF50', 'Medio': '#FFC107', 'Alto': '#F44336'}
+                    
+                    for nivel in ['Bajo', 'Medio', 'Alto']:
+                        if nivel in sexo_riesgo.columns:
+                            fig.add_trace(go.Bar(
+                                name=nivel,
+                                x=sexo_riesgo.index,
+                                y=sexo_riesgo[nivel],
+                                marker_color=colores[nivel],
+                                text=sexo_riesgo[nivel].round(1),
+                                texttemplate='%{text}%',
+                                textposition='inside',
+                                hovertemplate='%{y:.1f}%<extra></extra>'
+                            ))
+                    
+                    fig.update_layout(
+                        barmode='stack',
+                        title='Distribución de Riesgo por Sexo',
+                        xaxis_title="Sexo",
+                        yaxis_title="Porcentaje (%)",
+                        height=400,
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1
+                        )
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # ================================================================
+            # TAB 3: TABLA DETALLADA
+            # ================================================================
+            with tab3:
+                st.markdown("### 📋 Tabla Detallada de Estudiantes")
+                
+                # Filtros
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    filter_risk = st.multiselect(
+                        "Filtrar por Nivel de Riesgo",
+                        options=["Bajo", "Medio", "Alto"],
+                        default=["Alto"],
+                        help="Selecciona los niveles de riesgo a mostrar"
+                    )
+                
+                with col2:
+                    # Rango de probabilidad
+                    prob_min = float(df['probabilidad'].min())
+                    prob_max = float(df['probabilidad'].max())
+                    
+                    prob_range = st.slider(
+                        "Rango de Probabilidad",
+                        min_value=prob_min,
+                        max_value=prob_max,
+                        value=(prob_min, prob_max),
+                        format="%.2f",
+                        help="Filtra por rango de probabilidad"
+                    )
+                
+                with col3:
+                    # Buscar por ID
+                    search_id = st.text_input(
+                        "Buscar por ID",
+                        placeholder="Ej: 123456",
+                        help="Busca un estudiante específico por ID"
+                    )
+                
+                # Aplicar filtros
+                df_filtered = df.copy()
+                
+                if filter_risk:
+                    df_filtered = df_filtered[df_filtered['nivel_riesgo'].isin(filter_risk)]
+                
+                df_filtered = df_filtered[
+                    (df_filtered['probabilidad'] >= prob_range[0]) &
+                    (df_filtered['probabilidad'] <= prob_range[1])
+                ]
+                
+                if search_id:
+                    if 'ID' in df_filtered.columns:
+                        df_filtered = df_filtered[df_filtered['ID'].astype(str).str.contains(search_id, na=False)]
+                
+                st.info(f"📊 Mostrando {len(df_filtered):,} de {len(df):,} estudiantes")
+                
+                # Seleccionar columnas a mostrar
+                columnas_disponibles = ['ID', 'Mult Programa', 'Ciclo', 'Sexo', 'rango_edad', 
+                                       'Promedio Acumulado', 'Situacion Acad', 
+                                       'probabilidad', 'nivel_riesgo']
+                
+                display_columns = [c for c in columnas_disponibles if c in df_filtered.columns]
+                
+                if display_columns:
+                    # Crear DataFrame para mostrar
+                    df_display = df_filtered[display_columns].copy()
+                    
+                    # Agregar emoji de riesgo
+                    def get_risk_emoji(nivel):
+                        if nivel == "Alto":
+                            return "🔴"
+                        elif nivel == "Medio":
+                            return "🟡"
+                        else:
+                            return "🟢"
+                    
+                    df_display.insert(0, '🚦', df_display['nivel_riesgo'].apply(get_risk_emoji))
+                    
+                    # Formatear probabilidad
+                    if 'probabilidad' in df_display.columns:
+                        df_display['probabilidad'] = df_display['probabilidad'].apply(lambda x: f"{x:.2%}")
+                    
+                    # Formatear Sexo
+                    if 'Sexo' in df_display.columns:
+                        df_display['Sexo'] = df_display['Sexo'].map({1: 'M', 0: 'F'})
+                    
+                    # Mostrar tabla
+                    st.dataframe(
+                        df_display,
+                        use_container_width=True,
+                        height=400
+                    )
+                else:
+                    st.warning("⚠️ No hay columnas disponibles para mostrar")
+            
+            # ================================================================
+            # TAB 4: DESCARGAS
+            # ================================================================
+            with tab4:
+                st.markdown("### 💾 Descargar Resultados")
+                
+                st.info("""
+                Descarga los resultados completos con todas las predicciones y probabilidades.
+                Los archivos incluyen todas las columnas originales más las predicciones del modelo.
+                """)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### 📊 Excel Completo")
+                    
+                    from io import BytesIO
+                    output = BytesIO()
+                    
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False, sheet_name='Resultados')
+                    
+                    excel_data = output.getvalue()
+                    
+                    st.download_button(
+                        label="📥 Descargar Excel",
+                        data=excel_data,
+                        file_name=f"Predicciones_Desercion_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                    
+                    st.caption(f"Tamaño: {len(excel_data) / 1024:.1f} KB")
+                
+                with col2:
+                    st.markdown("#### 📄 CSV")
+                    
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    
+                    st.download_button(
+                        label="📥 Descargar CSV",
+                        data=csv,
+                        file_name=f"Predicciones_Desercion_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                    
+                    st.caption(f"Tamaño: {len(csv) / 1024:.1f} KB")
+                
+                st.markdown("---")
+                
+                # Resumen para descarga
+                st.markdown("#### 📋 Resumen de Contenido")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Registros", f"{len(df):,}")
+                
+                with col2:
+                    st.metric("Columnas", f"{len(df.columns)}")
+                
+                with col3:
+                    st.metric("Tamaño", f"{df.memory_usage(deep=True).sum() / 1024 / 1024:.2f} MB")
+                
+                # Lista de columnas incluidas
+                with st.expander("📋 Ver columnas incluidas en la descarga"):
+                    st.write(", ".join(df.columns.tolist()))
 
 else:  # Ayuda
     st.title("ℹ️ Ayuda y Documentación")
@@ -979,14 +1063,14 @@ else:  # Ayuda
     
     with st.expander("📊 ¿Cómo se calculan las probabilidades?"):
         st.markdown("""
-        El modelo utiliza **Regresión Logística**, una técnica de Machine Learning que:
+        El modelo utiliza **XGBoost**, una técnica de Machine Learning que:
         
         1. Analiza datos históricos de miles de estudiantes
         2. Identifica patrones y factores de riesgo
         3. Calcula una probabilidad personalizada para cada estudiante
         4. Clasifica el riesgo en tres niveles: Bajo, Medio y Alto
         
-        El modelo considera más de 150 variables diferentes.
+        El modelo considera 157 variables diferentes.
         """)
     
     with st.expander("🎯 ¿Qué hacer con los resultados?"):
