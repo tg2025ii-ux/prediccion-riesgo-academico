@@ -410,7 +410,7 @@ class DataProcessorAjustes:
         # Renombres
         renombres = {
             'Créditos Inscritos en Ciclo_prom': 'Créditos Inscritos en Ciclo',
-            'Créd.Inscritos y Aprobados Ciclo_prom': 'Créditos Inscritos y Aprobados Ciclo'
+            'Créd.Inscritos y Aprobados Ciclo': 'Créditos Inscritos y Aprobados Ciclo'
         }
         
         data = data.rename(columns={k: v for k, v in renombres.items() if k in data.columns})
@@ -418,7 +418,6 @@ class DataProcessorAjustes:
         # Eliminar columnas
         columnas_eliminar = [
             'Créditos Inscritos en Ciclo_per',
-            'Créd.Inscritos y Aprobados Ciclo_per',
             'Situacion Acad',
             'Créd Inscritos xa PromedioCicl',
             'Créd.Inscrtos Aprbdos PromCicl',
@@ -533,7 +532,6 @@ class DataProcessorAjustes:
         
         # ⚠️ ELIMINAR COLUMNA EDAD
         data = data.drop(columns=['Edad'])
-        #data = data.drop(columns=['desercion'])
         print("   ✓ Columna 'Edad' eliminada (ya no es necesaria)")
         
         return data
