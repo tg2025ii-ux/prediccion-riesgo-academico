@@ -274,7 +274,53 @@ if menu == "🏠 Inicio":
         </div>
         """, unsafe_allow_html=True)
 
-from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
+elif menu == "📤 Cargar Datos":
+    st.title("📤 Cargar Bases de Datos de la Universidad")
+    
+   st.markdown("### ⚙️ Cómo usar esta herramienta")
+    
+    steps = """
+    1. **📤 Ve a "Cargar Datos"** en el menú lateral
+    2. **📂 Sube tu archivo Excel** con las 4 hojas (NOTAS, PER, PROM, ADM)
+    3. **🚀 Click en "PROCESAR Y PREDECIR"** (el sistema ejecuta automáticamente todo el pipeline)
+    4. **📊 Ve a "Resultados"** para ver el dashboard interactivo
+    5. **💾 Descarga** los resultados en Excel o CSV
+    """
+    
+    st.info(steps)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🎯 Niveles de Riesgo")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown(f"""
+        <div class='metric-card risk-low'>
+            <h4>🟢 Riesgo Bajo</h4>
+            <p><b>Probabilidad < 30%</b></p>
+            <p>Estudiante con desempeño satisfactorio. Continuar con seguimiento regular.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class='metric-card risk-medium'>
+            <h4>🟡 Riesgo Medio</h4>
+            <p><b>Probabilidad 30-60%</b></p>
+            <p>Requiere atención. Considerar tutorías o acompañamiento académico.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"""
+        <div class='metric-card risk-high'>
+            <h4>🔴 Riesgo Alto</h4>
+            <p><b>Probabilidad > 60%</b></p>
+            <p>Requiere intervención inmediata. Apoyo prioritario necesario.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
@@ -395,11 +441,26 @@ elif menu == "📤 Cargar Datos":
                                 dfs['ADM']
                             )
                             
-                            st.success("✅ Datos procesados correctamente!")
+                            st.success("✅ Pipeline completado!")
                             
-                            # Guardar en session_state
-                            st.session_state['data_procesada'] = data_procesada
-                            st.session_state['archivo_cargado'] = uploaded_file.name
+                            # Ahora ejecutar predicción XGBoost
+                            st.markdown(f"""
+                            <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']}; margin-top: 1rem;'>
+                                <h4 style='color: {COLORS['text']}; margin: 0;'>🤖 Ejecutando modelo XGBoost...</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            with st.spinner("🤖 Generando predicciones..."):
+                                # Ejecutar predicción con el procesador
+                                resultados = processor.predict(data_procesada)
+                                
+                                # Guardar en session_state
+                                st.session_state['resultados'] = resultados
+                                st.session_state['data_procesada'] = data_procesada
+                                st.session_state['archivo_cargado'] = uploaded_file.name
+                                
+                                st.success("✅ ¡Predicción completada!")
+                                st.balloons()
                             
                             # Mostrar resumen
                             st.markdown("---")
@@ -409,75 +470,34 @@ elif menu == "📤 Cargar Datos":
                             
                             with col1:
                                 st.metric(
-                                    "📝 Registros Procesados",
-                                    f"{len(data_procesada):,}"
+                                    "📝 Estudiantes Analizados",
+                                    f"{len(resultados):,}"
                                 )
                             
                             with col2:
-                                st.metric(
-                                    "📊 Variables Totales",
-                                    f"{len(data_procesada.columns)}"
-                                )
+                                if 'probabilidad' in resultados.columns:
+                                    riesgo_alto = (resultados['probabilidad'] > 0.6).sum()
+                                    st.metric(
+                                        "🔴 Riesgo Alto",
+                                        f"{riesgo_alto:,}"
+                                    )
                             
                             with col3:
-                                if 'desercion' in data_procesada.columns:
-                                    desercion_count = (data_procesada['desercion'] == 1).sum()
+                                if 'probabilidad' in resultados.columns:
+                                    prob_promedio = resultados['probabilidad'].mean()
                                     st.metric(
-                                        "⚠️ Con Deserción",
-                                        f"{desercion_count:,}"
+                                        "📊 Riesgo Promedio",
+                                        f"{prob_promedio:.1%}"
                                     )
-                                else:
-                                    st.metric("⚠️ Deserción", "N/A")
                             
-                            # Mostrar vista previa
-                            st.markdown("---")
-                            st.markdown("### 👁️ Vista Previa de Datos Procesados")
-                            st.dataframe(
-                                data_procesada.head(50),
-                                use_container_width=True,
-                                height=300
-                            )
-                            
-                            # Botón para ir a predicción
+                            # Mensaje de éxito
                             st.markdown("---")
                             
                             st.success("""
-                            ✅ **¡Datos listos para predicción!**
+                            ✅ **¡Proceso completado exitosamente!**
                             
-                            Ahora ejecutaremos el modelo XGBoost para predecir riesgo de deserción.
+                            Ve a la sección **📊 Resultados** en el menú lateral para ver el análisis completo.
                             """)
-                            
-                            col1, col2, col3 = st.columns([1, 2, 1])
-                            with col2:
-                                if st.button("🤖 EJECUTAR PREDICCIÓN", type="primary", use_container_width=True):
-                                    with st.spinner("🤖 Ejecutando modelo XGBoost..."):
-                                        # Aquí se ejecuta la predicción
-                                        # El código de predicción ya está en tu app original
-                                        # Solo necesitamos ejecutarlo con data_procesada
-                                        
-                                        try:
-                                            # Usar el procesador que ya tienes
-                                            processor = st.session_state.get('processor', DataProcessorXGBoost())
-                                            
-                                            # Ejecutar predicción
-                                            resultados = processor.predict(data_procesada)
-                                            
-                                            # Guardar resultados
-                                            st.session_state['resultados'] = resultados
-                                            st.session_state['data_procesada_completa'] = data_procesada
-                                            
-                                            st.success("✅ ¡Predicción completada!")
-                                            st.balloons()
-                                            
-                                            st.info("""
-                                            **Predicción completada exitosamente!**
-                                            
-                                            Ve a la sección **📊 Resultados** en el menú lateral para ver el análisis completo.
-                                            """)
-                                            
-                                        except Exception as e:
-                                            st.error(f"❌ Error en la predicción: {str(e)}")
-                                            st.exception(e)
                     
                     except Exception as e:
                         st.error(f"❌ Error durante el procesamiento: {str(e)}")
