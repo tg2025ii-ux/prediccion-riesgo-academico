@@ -176,1263 +176,6 @@ class DataProcessorXGBoost:
         print("🔄 INICIANDO PIPELINE DE PROCESAMIENTO COMPLETO")
         print("="*70)
         
-        # FASE 1: Limpiezas y renames
-        print("\n📊 FASE 1: Limpieza de bases individuales")
-        notas = self._procesar_notas(notas)
-        per, per_original = self._procesar_per(per)
-        prom = self._procesar_prom(prom)
-        adm = self._procesar_adm(adm)
-        
-        # FASE 2: Filtros generales
-        print("\n🔍 FASE 2: Aplicando filtros")
-        per, prom = self._aplicar_filtros_generales(per, prom, per_original)
-        
-        # FASE 3: IDs comunes
-        print("\n🔗 FASE 3: Filtrando IDs comunes")
-        notas, per, prom, adm = self._filtrar_ids_comunes(notas, per, prom, adm)
-        
-        # FASE 4: Fusión secuencial
-        print("\n🔀 FASE 4: Fusionando bases")
-        data_fusionada = self._fusionar_bases(per, prom, notas, adm)
-        
-        # FASE 5: Calcular métricas de calificaciones
-        print("\n📊 FASE 5: Calculando métricas de calificaciones")
-        data_con_metricas = self._calcular_metricas_calificaciones(data_fusionada, notas)
-        
-        # FASE 6: Limpieza final y encoding
-        print("\n🧹 FASE 6: Limpieza final y encoding")
-        data_final = self._limpieza_y_encoding_final(data_con_metricas)
-        
-        print("\n" + "="*70)
-        print(f"✅ PIPELINE COMPLETADO: {len(data_final)} registros, {len(data_final.columns)} columnas")
-        print("="*70)
-        
-        return data_final
-    
-    def _procesar_notas(self, notas):
-        """Procesa la base NOTAS"""
-        print("  📋 Procesando NOTAS...")
-        
-        # RENOMBRAR COLUMNAS
-        rename_dict = {
-            'Grado Académico': 'Mult Programa',
-            'Programa Académico Base': 'Programa',
-            'Promedio_Ciclo': 'Promedio Ciclo',
-            'Estado.1': 'Estado Clase'
-        }
-        notas.rename(columns=rename_dict, inplace=True)
-        
-        # Eliminar columnas innecesarias
-        cols_drop = ['Nombre', 'Nº Oferta', 'Nº Clase', 'Sesión', 'Sección', 'Motivo']
-        notas.drop(columns=[c for c in cols_drop if c in notas.columns], inplace=True)
-        
-        print(f"    ✓ NOTAS procesadas: {len(notas)} registros")
-        return notas
-    
-    def _procesar_per(self, per):
-        """Procesa la base PER"""
-        print("  👤 Procesando PER...")
-        
-        # RENOMBRAR COLUMNAS
-        rename_dict = {
-            'Grado Académico': 'Mult Programa',
-            'Matrd Progr': 'Créditos Inscritos en Ciclo',
-            'Cred. Aprob.': 'Créd.Inscritos y Aprobados Ciclo',
-            'Ccl Admis': 'Ciclo Admisión',
-            'Lugar Nacimiento': 'Ciudad Nacimiento',
-            'Acc Prog': 'Acción',
-            'Motivo Acción': 'Motivo'
-        }
-        per.rename(columns=rename_dict, inplace=True)
-        
-        per_original = per.copy()
-        print(f"    ✓ PER procesada: {len(per)} registros")
-        return per, per_original
-    
-    def _procesar_prom(self, prom):
-        """Procesa la base PROM"""
-        print("  📈 Procesando PROM...")
-        
-        # RENOMBRAR COLUMNAS
-        rename_dict = {
-            'Grado': 'Mult Programa',
-            'Situacion Academica': 'Situacion Acad',
-            'Créd.Inscrtos y Aprobdos Ciclo': 'Créd.Inscritos y Aprobados Ciclo',
-            'Estado Programa Académico': 'Estado',
-            'Acción Programa': 'Acción',
-            'Motivo Accion': 'Motivo'
-        }
-        prom.rename(columns=rename_dict, inplace=True)
-        
-        print(f"    ✓ PROM procesada: {len(prom)} registros")
-        return prom
-    
-    def _procesar_adm(self, adm):
-        """Procesa la base ADM"""
-        print("  🎓 Procesando ADM...")
-        
-        # RENOMBRAR COLUMNAS
-        rename_dict = {
-            'Ciclo': 'Ciclo Admisión',
-            'País': 'País Nacimiento',
-            'Estado': 'Dpto Nacimiento',
-            'Programa Académico': 'Programa',
-            'Ciudad': 'Ciudad (Dirección)',
-            'ID Org Ext': 'ID Colegio',
-            'Descr': 'Colegio',
-            'Estado.1': 'Estado'
-        }
-        adm.rename(columns=rename_dict, inplace=True)
-        
-        # Filtrar solo estudiantes activos
-        if 'Estado' in adm.columns:
-            adm = adm[adm["Estado"] == "Activo en Programa"].copy()
-            print(f"    → Filtrados estudiantes activos")
-        
-        print(f"    ✓ ADM procesada: {len(adm)} registros")
-        return adm
-    
-    def _aplicar_filtros_generales(self, per, prom, per_original):
-        """Aplica los filtros generales del pipeline"""
-        # Eliminar ciclo máximo
-        ciclo_max_per = per['Ciclo'].max()
-        ciclo_max_prom = prom['Ciclo'].max()
-        
-        per = per[per['Ciclo'] != ciclo_max_per].copy()
-        prom = prom[prom['Ciclo'] != ciclo_max_prom].copy()
-        
-        print(f"    → Ciclo máximo PER eliminado: {ciclo_max_per}")
-        print(f"    → Ciclo máximo PROM eliminado: {ciclo_max_prom}")
-        
-        # Eliminar UCollege
-        per = per[per['Programa'] != 'UCollege Javeriano'].copy()
-        prom = prom[prom['Programa'] != 'UCollege Javeriano'].copy()
-        print(f"    → UCollege eliminado")
-        
-        # Filtrar solo ciclos que terminan en 10 o 30
-        per = per[per['Ciclo'].astype(str).str.endswith(('10', '30'))].copy()
-        prom = prom[prom['Ciclo'].astype(str).str.endswith(('10', '30'))].copy()
-        print(f"    → Ciclos filtrados (solo 10 y 30)")
-        
-        # Eliminar registros con 0 créditos
-        if 'Créditos Inscritos en Ciclo' in per.columns:
-            per = per[per['Créditos Inscritos en Ciclo'] > 0].copy()
-            print(f"    → Registros con 0 créditos eliminados")
-        
-        return per, prom
-    
-    def _filtrar_ids_comunes(self, notas, per, prom, adm):
-        """Filtra solo IDs que estén en las 4 bases"""
-        ids_comunes = set(notas["ID"]) & set(per["ID"]) & set(prom["ID"]) & set(adm["ID"])
-        
-        notas = notas[notas["ID"].isin(ids_comunes)].copy()
-        per = per[per["ID"].isin(ids_comunes)].copy()
-        prom = prom[prom["ID"].isin(ids_comunes)].copy()
-        adm = adm[adm["ID"].isin(ids_comunes)].copy()
-        
-        print(f"    → IDs comunes: {len(ids_comunes)}")
-        
-        return notas, per, prom, adm
-    
-    def _fusionar_bases(self, per, prom, notas, adm):
-        """Fusiona las 4 bases secuencialmente"""
-        # 1. PER + PROM
-        per_prom = per.merge(
-            prom,
-            on=['ID', 'Mult Programa', 'Programa', 'Ciclo'],
-            how='inner',
-            suffixes=('_per', '_prom')
-        )
-        print(f"    1. PER + PROM = {len(per_prom)} registros")
-        
-        # 2. (PER+PROM) + NOTAS
-        per_prom_notas = per_prom.merge(
-            notas,
-            on=['ID', 'Mult Programa', 'Programa', 'Ciclo'],
-            how='left',
-            suffixes=('_pprom', '_notas')
-        )
-        print(f"    2. (PER+PROM) + NOTAS = {len(per_prom_notas)} registros")
-        
-        # 3. (PER+PROM+NOTAS) + ADM
-        data_final = per_prom_notas.merge(
-            adm,
-            on=['ID', 'Programa'],
-            how='left',
-            suffixes=('_ppn', '_adm')
-        )
-        print(f"    3. (PER+PROM+NOTAS) + ADM = {len(data_final)} registros")
-        
-        return data_final
-    
-    def _calcular_metricas_calificaciones(self, data, notas):
-        """
-        Calcula métricas de calificaciones por estudiante/ciclo
-        Réplica de calcular_metricas_calificaciones_paso2_optimizado
-        """
-        print("    🔢 Calculando métricas...")
-        
-        # Agrupar por ID, Mult Programa, Ciclo
-        grupos = notas.groupby(['ID', 'Mult Programa', 'Ciclo'])
-        
-        metricas_lista = []
-        
-        for (id_est, mult_prog, ciclo), grupo in grupos:
-            if 'Calif' not in grupo.columns or 'Uni Matrd' not in grupo.columns:
-                continue
-            
-            califs = grupo['Calif'].values
-            creditos = grupo['Uni Matrd'].values
-            
-            if len(califs) == 0:
-                continue
-            
-            # Calcular métricas
-            promedio = np.average(califs, weights=creditos)
-            
-            if len(califs) > 1:
-                varianza = np.average((califs - promedio)**2, weights=creditos)
-                desviacion = np.sqrt(varianza)
-            else:
-                desviacion = 0.0
-            
-            # MIN y sus detalles
-            idx_min = grupo['Calif'].idxmin()
-            min_calif = grupo.loc[idx_min, 'Calif']
-            min_creditos = grupo.loc[idx_min, 'Uni Matrd']
-            min_id_curso = grupo.loc[idx_min, 'ID Curso'] if 'ID Curso' in grupo.columns else ''
-            min_descripcion = grupo.loc[idx_min, 'Descripción'] if 'Descripción' in grupo.columns else 'Sin datos'
-            
-            # MAX y sus detalles
-            idx_max = grupo['Calif'].idxmax()
-            max_calif = grupo.loc[idx_max, 'Calif']
-            max_creditos = grupo.loc[idx_max, 'Uni Matrd']
-            max_id_curso = grupo.loc[idx_max, 'ID Curso'] if 'ID Curso' in grupo.columns else ''
-            max_descripcion = grupo.loc[idx_max, 'Descripción'] if 'Descripción' in grupo.columns else 'Sin datos'
-            
-            # Rango ponderado
-            contribuciones = califs * creditos
-            rango_ponderado = contribuciones.max() - contribuciones.min()
-            
-            metricas_lista.append({
-                'ID': id_est,
-                'Mult Programa': mult_prog,
-                'Ciclo': ciclo,
-                'Promedio_Ciclo': round(promedio, 2),
-                'Des_Estandar_Ciclo': round(desviacion, 2),
-                'Min_Ciclo': round(min_calif, 2),
-                'Cred_Min_Calif_Ciclo': min_creditos,
-                'ID_Min_Ciclo': min_id_curso,
-                'Clase_Min_Ciclo': str(min_descripcion),
-                'Max_Ciclo': round(max_calif, 2),
-                'Cred_Max_Calif_Ciclo': max_creditos,
-                'ID_Max_Ciclo': max_id_curso,
-                'Clase_Max_Ciclo': str(max_descripcion),
-                'Rango_Ponderado_Ciclo': round(rango_ponderado, 2)
-            })
-        
-        metricas_df = pd.DataFrame(metricas_lista)
-        
-        # Merge con data
-        data_con_metricas = data.merge(
-            metricas_df,
-            on=['ID', 'Mult Programa', 'Ciclo'],
-            how='left'
-        )
-        
-        # Rellenar NaN
-        data_con_metricas['Clase_Min_Ciclo'].fillna('Sin datos', inplace=True)
-        data_con_metricas['Clase_Max_Ciclo'].fillna('Sin datos', inplace=True)
-        
-        print(f"    ✓ Métricas calculadas: {len(metricas_df)} grupos")
-        
-        return data_con_metricas
-    
-    def _limpieza_y_encoding_final(self, data):
-        """Limpieza final y generación de todas las variables dummy"""
-        print("    🧹 Iniciando limpieza y encoding...")
-        print(f"       Columnas antes: {len(data.columns)}")
-        
-        # ============================================================
-        # PASO CRÍTICO: CALCULAR SIGLAS PROG (del Pipeline__2_)
-        # ============================================================
-        # Calcular la moda de Prog Acad_ppn por grupo (Mult Programa + Programa)
-        if 'Prog Acad_ppn' in data.columns and 'Mult Programa' in data.columns and 'Programa' in data.columns:
-            print("       → Calculando 'Siglas Prog' desde Prog Acad_ppn (moda por grupo)...")
-            
-            moda_por_grupo = (
-                data.groupby(["Mult Programa", "Programa"])["Prog Acad_ppn"]
-                .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else None)
-                .reset_index()
-                .rename(columns={"Prog Acad_ppn": "Prog Acad_ppn_moda"})
-            )
-            
-            # Unir la moda con el dataframe
-            data = data.merge(moda_por_grupo, on=["Mult Programa", "Programa"], how="left")
-            
-            # Crear Siglas Prog normalizado
-            data["Siglas Prog"] = data["Prog Acad_ppn_moda"]
-            
-            # Limpiar columnas auxiliares
-            data.drop(columns=["Prog Acad_ppn_moda"], inplace=True, errors='ignore')
-            
-            print(f"         ✓ Siglas Prog calculadas: {data['Siglas Prog'].nunique()} valores únicos")
-        
-        elif 'Prog Acad' in data.columns:
-            print("       → Usando 'Prog Acad' como 'Siglas Prog' (fallback)...")
-            data['Siglas Prog'] = data['Prog Acad']
-        else:
-            print("       ⚠️ NO se puede crear 'Siglas Prog' - NO HAY Prog Acad")
-        
-        # Normalizar Clase_Min_Ciclo y Clase_Max_Ciclo
-        if 'Clase_Min_Ciclo' in data.columns:
-            data['Clase_Min_Ciclo'] = data['Clase_Min_Ciclo'].str.title()
-            print(f"       ✓ Clase_Min_Ciclo normalizada: {data['Clase_Min_Ciclo'].nunique()} valores únicos")
-        if 'Clase_Max_Ciclo' in data.columns:
-            data['Clase_Max_Ciclo'] = data['Clase_Max_Ciclo'].str.title()
-            print(f"       ✓ Clase_Max_Ciclo normalizada: {data['Clase_Max_Ciclo'].nunique()} valores únicos")
-        
-        # Mapear a categorías
-        if self.mapa_categorias and len(self.mapa_categorias) > 0:
-            if 'Clase_Min_Ciclo' in data.columns:
-                print("       → Mapeando Clase_Min_Ciclo a categorías...")
-                data['Cat_ClaseMin'] = data['Clase_Min_Ciclo'].map(self.mapa_categorias)
-                data['Cat_ClaseMin'] = data['Cat_ClaseMin'].fillna('Otros')
-                print(f"         Categorías Min únicas: {data['Cat_ClaseMin'].nunique()}")
-            
-            if 'Clase_Max_Ciclo' in data.columns:
-                print("       → Mapeando Clase_Max_Ciclo a categorías...")
-                data['Cat_ClaseMax'] = data['Clase_Max_Ciclo'].map(self.mapa_categorias)
-                data['Cat_ClaseMax'] = data['Cat_ClaseMax'].fillna('Otros')
-                print(f"         Categorías Max únicas: {data['Cat_ClaseMax'].nunique()}")
-        
-        # ============================================================
-        # LIMPIAR CIUDAD (DIRECCIÓN) - Convertir valores inválidos a 'Otro'
-        # ============================================================
-        def limpiar_ciudad(col_ciudad):
-            """Convierte valores no válidos a 'Otro'"""
-            import re
-            
-            valores_a_otro = [
-                'Rm', 'Ma', 'Ar', 'La', 'Lp', 'Zu', 'Bo', 'An', 'Po', 'Pr', 'Ct',
-                'Co', 'Sp', 'Ta', 'Lo', 'Sc', 'Nsw', 'Gt Lon', 'Ccs', 'Qroo',
-                '92500 Rueil-Malmaison', 'Roma Rm', 'Otro'
-            ]
-            
-            def debe_ser_otro(valor):
-                if pd.isna(valor):
-                    return False
-                
-                valor_str = str(valor).strip()
-                
-                if valor_str in valores_a_otro:
-                    return True
-                
-                valor_sin_espacios = valor_str.replace(' ', '')
-                if len(valor_sin_espacios) <= 2:
-                    return True
-                
-                if re.match(r'^[A-Z]{2,3}$', valor_sin_espacios):
-                    return True
-                
-                if re.match(r'^\d+', valor_str):
-                    return True
-                
-                return False
-            
-            return col_ciudad.apply(lambda x: 'Otro' if debe_ser_otro(x) else x)
-        
-        # Buscar y limpiar Ciudad (Dirección)
-        col_ciudad = None
-        for c in data.columns:
-            if 'Ciudad' in c and 'Dirección' in c:
-                col_ciudad = c
-                break
-        
-        if col_ciudad:
-            print(f"       → Limpiando ciudades inválidas en {col_ciudad}...")
-            data[col_ciudad] = limpiar_ciudad(data[col_ciudad])
-        
-        # ============================================================
-        # ENCODING - Crear variables dummy
-        # ============================================================
-        
-        # 1. Programa → p_
-        if 'Programa' in data.columns:
-            print(f"       → Encoding: Programa ({data['Programa'].nunique()} programas)")
-            dummies = pd.get_dummies(data['Programa'], prefix='p')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Programa'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de programas")
-        
-        # 2. Siglas Prog → s_
-        if 'Siglas Prog' in data.columns:
-            print(f"       → Encoding: Siglas Prog ({data['Siglas Prog'].nunique()} siglas)")
-            dummies = pd.get_dummies(data['Siglas Prog'], prefix='s')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Siglas Prog'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de siglas")
-        
-        # 3. Ciudad (Dirección) → cd_
-        if col_ciudad:
-            print(f"       → Encoding: {col_ciudad} ({data[col_ciudad].nunique()} ciudades)")
-            dummies = pd.get_dummies(data[col_ciudad], prefix='cd')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_ciudad], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de ciudades")
-        
-        # 4. Dpto Nacimiento → dn_
-        col_dpto = None
-        for c in data.columns:
-            if 'Dpto' in c and 'Nacimiento' in c:
-                col_dpto = c
-                break
-        
-        if col_dpto:
-            print(f"       → Encoding: {col_dpto} ({data[col_dpto].nunique()} departamentos)")
-            dummies = pd.get_dummies(data[col_dpto], prefix='dn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_dpto], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de departamentos")
-        
-        # 5. País Nacimiento → pn_
-        col_pais = None
-        for c in data.columns:
-            if 'País' in c and 'Nacimiento' in c:
-                col_pais = c
-                break
-        
-        if col_pais:
-            print(f"       → Encoding: {col_pais} ({data[col_pais].nunique()} países)")
-            dummies = pd.get_dummies(data[col_pais], prefix='pn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_pais], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de países")
-        
-        # 6. Acción → a_
-        col_accion = None
-        for c in data.columns:
-            if c == 'Acción' or (c.startswith('Acción') and '_' in c):
-                col_accion = c
-                break
-        
-        if col_accion:
-            print(f"       → Encoding: {col_accion} ({data[col_accion].nunique()} acciones)")
-            dummies = pd.get_dummies(data[col_accion], prefix='a')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_accion], inplace=True)
-            cols_accion = [c for c in data.columns if c.startswith('Acción')]
-            if cols_accion:
-                data.drop(columns=cols_accion, inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de acciones")
-        
-        # 7. Motivo → m_
-        col_motivo = None
-        for c in data.columns:
-            if c == 'Motivo' or (c.startswith('Motivo') and '_' in c):
-                col_motivo = c
-                break
-        
-        if col_motivo:
-            print(f"       → Encoding: {col_motivo} ({data[col_motivo].nunique()} motivos)")
-            dummies = pd.get_dummies(data[col_motivo], prefix='m')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_motivo], inplace=True)
-            cols_motivo = [c for c in data.columns if c.startswith('Motivo')]
-            if cols_motivo:
-                data.drop(columns=cols_motivo, inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de motivos")
-        
-        # 8. Cat_ClaseMax → ccmax_
-        if 'Cat_ClaseMax' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMax ({data['Cat_ClaseMax'].nunique()} categorías)")
-            dummies = pd.get_dummies(data['Cat_ClaseMax'], prefix='ccmax')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMax'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies ccmax")
-        
-        # 9. Cat_ClaseMin → ccmin_
-        if 'Cat_ClaseMin' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMin ({data['Cat_ClaseMin'].nunique()} categorías)")
-            dummies = pd.get_dummies(data['Cat_ClaseMin'], prefix='ccmin')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMin'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies ccmin")
-        
-        # 10. Tipo Admisión → ta_
-        col_tipo_adm = None
-        for c in data.columns:
-            if 'Tipo' in c and 'Admisión' in c:
-                col_tipo_adm = c
-                break
-        
-        if col_tipo_adm:
-            print(f"       → Encoding: {col_tipo_adm} ({data[col_tipo_adm].nunique()} tipos)")
-            dummies = pd.get_dummies(data[col_tipo_adm], prefix='ta')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_tipo_adm], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de tipo admisión")
-        
-        # 11. Sexo → numérico
-        col_sexo = None
-        for c in data.columns:
-            if c == 'Sexo' or (c.startswith('Sexo') and '_' in c):
-                col_sexo = c
-                break
-        
-        if col_sexo:
-            print(f"       → Encoding: {col_sexo} (numérico)")
-            data['Sexo'] = data[col_sexo].replace({'M': 1, 'F': 0, 'Masculino': 1, 'Femenino': 0})
-            if col_sexo != 'Sexo':
-                data.drop(columns=[col_sexo], inplace=True)
-            cols_sexo = [c for c in data.columns if c.startswith('Sexo') and c != 'Sexo']
-            if cols_sexo:
-                data.drop(columns=cols_sexo, inplace=True)
-        
-        # 12. Edad → rangos
-        if 'Edad' in data.columns:
-            print("       → Encoding: Edad (rangos)")
-            def map_age_groups(age):
-                if pd.isna(age):
-                    return 0
-                if age <= 19:
-                    return 0
-                elif age <= 24:
-                    return 1
-                else:
-                    return 3
-            
-            data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
-            data.drop(columns=['Edad'], inplace=True)
-        
-        # Eliminar columnas innecesarias
-        cols_eliminar = [
-            'ID', 'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última',
-            '2º Apellido', '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
-            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm',
-            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad', 'Doc ID_adm', 'Doc ID_ppn',
-            'Dirección', 'Dirección 1', 'Dirección 2',
-            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
-            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
-            'Celular Inscripción', 'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm',
-            'Fecha Grado', 'Estado (Dirección)', 'País (Dirección)',
-            'Ciudad Nacimiento', 'Lugar Nacimiento', 'Colegio', 'Colegio_ppn', 'Colegio_adm',
-            'ID Colegio', 'Descripción', 'Org Acad', 'Tipo', 'Estado_adm', 'Estado Clase',
-            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
-            'Ciclo Admisión_per', 'Ciclo Admisión_prom', 'Ciclo Admisión', 'Situacion Acad',
-            'Año', 'Año_per', 'Año_prom', 'Estado', 'Estado_per', 'Estado_ppn', 'Estado_prom',
-            'Clase_Min_Ciclo', 'Clase_Max_Ciclo',
-            'ID_Min_Ciclo', 'ID_Max_Ciclo', 'Mult Programa', 'Ciclo',
-            'ID Curso', 'Calif', 'Uni Matrd', 'Benef. Beca',
-            'Créd Inscritos xa PromedioCicl', 'Créd.Inscrtos Aprbdos PromCicl'
-        ]
-        
-        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
-        if cols_encontradas:
-            data.drop(columns=cols_encontradas, inplace=True)
-        
-        # Eliminar columnas con sufijos
-        cols_sufijos = [col for col in data.columns 
-                       if any(col.endswith(s) for s in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
-        if cols_sufijos:
-            print(f"       → Eliminando {len(cols_sufijos)} columnas con sufijos")
-            data.drop(columns=cols_sufijos, inplace=True)
-        
-        # Convertir fechas
-        for col in data.select_dtypes(include=['datetime64']).columns:
-            try:
-                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
-                data[col] = data[col].fillna(0)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        # Convertir columnas object a numérico
-        for col in data.select_dtypes(include=['object']).columns:
-            try:
-                data[col] = pd.to_numeric(data[col], errors='coerce')
-                data[col] = data[col].fillna(0)
-            except:
-                print(f"       ⚠️ No se pudo convertir '{col}', eliminando...")
-                data.drop(columns=[col], inplace=True)
-        
-        print(f"\n       ✓ Columnas después del encoding: {len(data.columns)}")
-        print(f"       ✓ Tipos de datos finales:")
-        print(f"          {data.dtypes.value_counts().to_dict()}")
-        
-        return data
-        """Limpieza final y generación de todas las variables dummy"""
-        print("    🧹 Iniciando limpieza y encoding...")
-        print(f"       Columnas antes: {len(data.columns)}")
-        
-        # IMPORTANTE: Crear Siglas Prog a partir de Prog Acad si no existe
-        if 'Siglas Prog' not in data.columns:
-            if 'Prog Acad' in data.columns:
-                print("       → Creando 'Siglas Prog' a partir de 'Prog Acad'")
-                data['Siglas Prog'] = data['Prog Acad']
-            elif 'Prog Acad_ppn' in data.columns:
-                print("       → Creando 'Siglas Prog' a partir de 'Prog Acad_ppn'")
-                data['Siglas Prog'] = data['Prog Acad_ppn']
-            else:
-                print("       ⚠️ NO se puede crear 'Siglas Prog' - NO HAY Prog Acad")
-        
-        # Normalizar Clase_Min_Ciclo y Clase_Max_Ciclo
-        if 'Clase_Min_Ciclo' in data.columns:
-            data['Clase_Min_Ciclo'] = data['Clase_Min_Ciclo'].str.title()
-            print(f"       ✓ Clase_Min_Ciclo normalizada: {data['Clase_Min_Ciclo'].nunique()} valores únicos")
-        if 'Clase_Max_Ciclo' in data.columns:
-            data['Clase_Max_Ciclo'] = data['Clase_Max_Ciclo'].str.title()
-            print(f"       ✓ Clase_Max_Ciclo normalizada: {data['Clase_Max_Ciclo'].nunique()} valores únicos")
-        
-        # Mapear a categorías
-        if self.mapa_categorias and len(self.mapa_categorias) > 0:
-            if 'Clase_Min_Ciclo' in data.columns:
-                print("       → Mapeando Clase_Min_Ciclo a categorías...")
-                data['Cat_ClaseMin'] = data['Clase_Min_Ciclo'].map(self.mapa_categorias)
-                data['Cat_ClaseMin'] = data['Cat_ClaseMin'].fillna('Otros')
-                print(f"         Categorías Min únicas: {data['Cat_ClaseMin'].nunique()}")
-            
-            if 'Clase_Max_Ciclo' in data.columns:
-                print("       → Mapeando Clase_Max_Ciclo a categorías...")
-                data['Cat_ClaseMax'] = data['Clase_Max_Ciclo'].map(self.mapa_categorias)
-                data['Cat_ClaseMax'] = data['Cat_ClaseMax'].fillna('Otros')
-                print(f"         Categorías Max únicas: {data['Cat_ClaseMax'].nunique()}")
-        
-        # ENCODING - Crear variables dummy
-        
-        # 1. Programa → p_
-        if 'Programa' in data.columns:
-            print(f"       → Encoding: Programa ({data['Programa'].nunique()} programas)")
-            dummies = pd.get_dummies(data['Programa'], prefix='p')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Programa'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de programas")
-        
-        # 2. Siglas Prog → s_
-        if 'Siglas Prog' in data.columns:
-            print(f"       → Encoding: Siglas Prog ({data['Siglas Prog'].nunique()} siglas)")
-            dummies = pd.get_dummies(data['Siglas Prog'], prefix='s')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Siglas Prog'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de siglas")
-        
-        # 3. Ciudad (Dirección) → cd_
-        col_ciudad = None
-        for c in data.columns:
-            if 'Ciudad' in c and 'Dirección' in c:
-                col_ciudad = c
-                break
-        
-        if col_ciudad:
-            print(f"       → Encoding: {col_ciudad} ({data[col_ciudad].nunique()} ciudades)")
-            dummies = pd.get_dummies(data[col_ciudad], prefix='cd')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_ciudad], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de ciudades")
-        
-        # 4. Dpto Nacimiento → dn_
-        col_dpto = None
-        for c in data.columns:
-            if 'Dpto' in c and 'Nacimiento' in c:
-                col_dpto = c
-                break
-        
-        if col_dpto:
-            print(f"       → Encoding: {col_dpto} ({data[col_dpto].nunique()} departamentos)")
-            dummies = pd.get_dummies(data[col_dpto], prefix='dn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_dpto], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de departamentos")
-        
-        # 5. País Nacimiento → pn_
-        col_pais = None
-        for c in data.columns:
-            if 'País' in c and 'Nacimiento' in c:
-                col_pais = c
-                break
-        
-        if col_pais:
-            print(f"       → Encoding: {col_pais} ({data[col_pais].nunique()} países)")
-            dummies = pd.get_dummies(data[col_pais], prefix='pn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_pais], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de países")
-        
-        # 6. Acción → a_
-        col_accion = None
-        for c in data.columns:
-            if c == 'Acción' or (c.startswith('Acción') and '_' in c):
-                col_accion = c
-                break
-        
-        if col_accion:
-            print(f"       → Encoding: {col_accion} ({data[col_accion].nunique()} acciones)")
-            dummies = pd.get_dummies(data[col_accion], prefix='a')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_accion], inplace=True)
-            # Eliminar otros Acción con sufijos
-            cols_accion = [c for c in data.columns if c.startswith('Acción')]
-            if cols_accion:
-                data.drop(columns=cols_accion, inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de acciones")
-        
-        # 7. Motivo → m_
-        col_motivo = None
-        for c in data.columns:
-            if c == 'Motivo' or (c.startswith('Motivo') and '_' in c):
-                col_motivo = c
-                break
-        
-        if col_motivo:
-            print(f"       → Encoding: {col_motivo} ({data[col_motivo].nunique()} motivos)")
-            dummies = pd.get_dummies(data[col_motivo], prefix='m')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_motivo], inplace=True)
-            # Eliminar otros Motivo con sufijos
-            cols_motivo = [c for c in data.columns if c.startswith('Motivo')]
-            if cols_motivo:
-                data.drop(columns=cols_motivo, inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de motivos")
-        
-        # 8. Cat_ClaseMax → ccmax_
-        if 'Cat_ClaseMax' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMax ({data['Cat_ClaseMax'].nunique()} categorías)")
-            dummies = pd.get_dummies(data['Cat_ClaseMax'], prefix='ccmax')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMax'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies ccmax")
-        
-        # 9. Cat_ClaseMin → ccmin_
-        if 'Cat_ClaseMin' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMin ({data['Cat_ClaseMin'].nunique()} categorías)")
-            dummies = pd.get_dummies(data['Cat_ClaseMin'], prefix='ccmin')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMin'], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies ccmin")
-        
-        # 10. Tipo Admisión → ta_
-        col_tipo_adm = None
-        for c in data.columns:
-            if 'Tipo' in c and 'Admisión' in c:
-                col_tipo_adm = c
-                break
-        
-        if col_tipo_adm:
-            print(f"       → Encoding: {col_tipo_adm} ({data[col_tipo_adm].nunique()} tipos)")
-            dummies = pd.get_dummies(data[col_tipo_adm], prefix='ta')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_tipo_adm], inplace=True)
-            print(f"         ✓ Generadas {len(dummies.columns)} dummies de tipo admisión")
-        
-        # 11. Sexo → numérico
-        col_sexo = None
-        for c in data.columns:
-            if c == 'Sexo' or (c.startswith('Sexo') and '_' in c):
-                col_sexo = c
-                break
-        
-        if col_sexo:
-            print(f"       → Encoding: {col_sexo} (numérico)")
-            data['Sexo'] = data[col_sexo].replace({'M': 1, 'F': 0, 'Masculino': 1, 'Femenino': 0})
-            if col_sexo != 'Sexo':
-                data.drop(columns=[col_sexo], inplace=True)
-            # Eliminar otros Sexo con sufijos
-            cols_sexo = [c for c in data.columns if c.startswith('Sexo') and c != 'Sexo']
-            if cols_sexo:
-                data.drop(columns=cols_sexo, inplace=True)
-        
-        # 12. Edad → rangos
-        if 'Edad' in data.columns:
-            print("       → Encoding: Edad (rangos)")
-            def map_age_groups(age):
-                if pd.isna(age):
-                    return 0
-                if age <= 19:
-                    return 0
-                elif age <= 24:
-                    return 1
-                else:
-                    return 3
-            
-            data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
-            data.drop(columns=['Edad'], inplace=True)
-        
-        # Eliminar columnas innecesarias
-        cols_eliminar = [
-            'ID', 'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última',
-            '2º Apellido', '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
-            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm',
-            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad', 'Doc ID_adm', 'Doc ID_ppn',
-            'Dirección', 'Dirección 1', 'Dirección 2',
-            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
-            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
-            'Celular Inscripción', 'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm',
-            'Fecha Grado', 'Estado (Dirección)', 'País (Dirección)',
-            'Ciudad Nacimiento', 'Lugar Nacimiento', 'Colegio', 'Colegio_ppn', 'Colegio_adm',
-            'ID Colegio', 'Descripción', 'Org Acad', 'Tipo', 'Estado_adm', 'Estado Clase',
-            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
-            'Ciclo Admisión_per', 'Ciclo Admisión_prom', 'Ciclo Admisión', 'Situacion Acad',
-            'Año', 'Año_per', 'Año_prom', 'Estado', 'Estado_per', 'Estado_ppn', 'Estado_prom',
-            'Clase_Min_Ciclo', 'Clase_Max_Ciclo',
-            'ID_Min_Ciclo', 'ID_Max_Ciclo', 'Mult Programa', 'Ciclo',
-            'ID Curso', 'Calif', 'Uni Matrd', 'Benef. Beca',
-            'Créd Inscritos xa PromedioCicl', 'Créd.Inscrtos Aprbdos PromCicl'
-        ]
-        
-        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
-        if cols_encontradas:
-            data.drop(columns=cols_encontradas, inplace=True)
-        
-        # Eliminar columnas con sufijos
-        cols_sufijos = [col for col in data.columns 
-                       if any(col.endswith(s) for s in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
-        if cols_sufijos:
-            print(f"       → Eliminando {len(cols_sufijos)} columnas con sufijos")
-            data.drop(columns=cols_sufijos, inplace=True)
-        
-        # Convertir fechas
-        for col in data.select_dtypes(include=['datetime64']).columns:
-            try:
-                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
-                data[col] = data[col].fillna(0)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        # Convertir columnas object a numérico
-        for col in data.select_dtypes(include=['object']).columns:
-            try:
-                data[col] = pd.to_numeric(data[col], errors='coerce')
-                data[col] = data[col].fillna(0)
-            except:
-                print(f"       ⚠️ No se pudo convertir '{col}', eliminando...")
-                data.drop(columns=[col], inplace=True)
-        
-        print(f"\n       ✓ Columnas después del encoding: {len(data.columns)}")
-        print(f"       ✓ Tipos de datos finales:")
-        print(f"          {data.dtypes.value_counts().to_dict()}")
-        
-        return data
-        """Limpieza final y generación de todas las variables dummy"""
-        print("    🧹 Iniciando limpieza y encoding...")
-        print(f"       Columnas antes: {len(data.columns)}")
-        print(f"       Columnas disponibles: {sorted(data.columns)[:50]}")  # Primeras 50
-        
-        # Normalizar Clase_Min_Ciclo y Clase_Max_Ciclo
-        if 'Clase_Min_Ciclo' in data.columns:
-            data['Clase_Min_Ciclo'] = data['Clase_Min_Ciclo'].str.title()
-            print(f"       ✓ Clase_Min_Ciclo normalizada: {data['Clase_Min_Ciclo'].nunique()} valores únicos")
-        if 'Clase_Max_Ciclo' in data.columns:
-            data['Clase_Max_Ciclo'] = data['Clase_Max_Ciclo'].str.title()
-            print(f"       ✓ Clase_Max_Ciclo normalizada: {data['Clase_Max_Ciclo'].nunique()} valores únicos")
-        
-        # Mapear a categorías
-        if self.mapa_categorias:
-            print("       → Mapeando Clase_Min_Ciclo a categorías...")
-            data['Cat_ClaseMin'] = data['Clase_Min_Ciclo'].map(self.mapa_categorias)
-            data['Cat_ClaseMin'] = data['Cat_ClaseMin'].fillna('Otros')
-            print(f"         Categorías Min únicas: {data['Cat_ClaseMin'].nunique()}")
-            
-            print("       → Mapeando Clase_Max_Ciclo a categorías...")
-            data['Cat_ClaseMax'] = data['Clase_Max_Ciclo'].map(self.mapa_categorias)
-            data['Cat_ClaseMax'] = data['Cat_ClaseMax'].fillna('Otros')
-            print(f"         Categorías Max únicas: {data['Cat_ClaseMax'].nunique()}")
-        
-        # Buscar columnas clave
-        columnas_clave = {
-            'Programa': [c for c in data.columns if 'Programa' in c and 'Académico' not in c],
-            'Siglas': [c for c in data.columns if 'Siglas' in c],
-            'Ciudad': [c for c in data.columns if 'Ciudad' in c and 'Dirección' in c],
-            'Dpto': [c for c in data.columns if 'Dpto' in c and 'Nacimiento' in c],
-            'País': [c for c in data.columns if 'País' in c and 'Nacimiento' in c],
-            'Acción': [c for c in data.columns if 'Acción' in c],
-            'Motivo': [c for c in data.columns if 'Motivo' in c],
-            'Tipo Admisión': [c for c in data.columns if 'Tipo' in c and 'Admisión' in c],
-            'Sexo': [c for c in data.columns if 'Sexo' in c],
-            'Edad': [c for c in data.columns if 'Edad' in c],
-        }
-        
-        print("\n       📋 Columnas encontradas para encoding:")
-        for nombre, cols in columnas_clave.items():
-            if cols:
-                print(f"         {nombre}: {cols}")
-            else:
-                print(f"         {nombre}: ❌ NO ENCONTRADA")
-        print()
-        
-        # ENCODING - Crear variables dummy en el orden del pipeline
-        
-        # 1. Programa → p_
-        if 'Programa' in data.columns:
-            print(f"       → Encoding: Programa ({data['Programa'].nunique()} valores)")
-            dummies = pd.get_dummies(data['Programa'], prefix='p')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Programa'], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 2. Siglas Prog → s_
-        if 'Siglas Prog' in data.columns:
-            print(f"       → Encoding: Siglas Prog ({data['Siglas Prog'].nunique()} valores)")
-            dummies = pd.get_dummies(data['Siglas Prog'], prefix='s')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Siglas Prog'], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 3. Ciudad (Dirección) → cd_
-        col_ciudad = None
-        for c in data.columns:
-            if 'Ciudad' in c and 'Dirección' in c:
-                col_ciudad = c
-                break
-        
-        if col_ciudad:
-            print(f"       → Encoding: {col_ciudad} ({data[col_ciudad].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_ciudad], prefix='cd')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_ciudad], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 4. Dpto Nacimiento → dn_
-        col_dpto = None
-        for c in data.columns:
-            if 'Dpto' in c and 'Nacimiento' in c:
-                col_dpto = c
-                break
-        
-        if col_dpto:
-            print(f"       → Encoding: {col_dpto} ({data[col_dpto].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_dpto], prefix='dn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_dpto], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 5. País Nacimiento → pn_
-        col_pais = None
-        for c in data.columns:
-            if 'País' in c and 'Nacimiento' in c:
-                col_pais = c
-                break
-        
-        if col_pais:
-            print(f"       → Encoding: {col_pais} ({data[col_pais].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_pais], prefix='pn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_pais], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 6. Acción → a_
-        # Buscar cualquier columna con Acción
-        col_accion = None
-        for c in data.columns:
-            if 'Acción' in c or 'Accion' in c:
-                col_accion = c
-                break
-        
-        if col_accion:
-            print(f"       → Encoding: {col_accion} ({data[col_accion].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_accion], prefix='a')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_accion], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 7. Motivo → m_
-        col_motivo = None
-        for c in data.columns:
-            if 'Motivo' in c:
-                col_motivo = c
-                break
-        
-        if col_motivo:
-            print(f"       → Encoding: {col_motivo} ({data[col_motivo].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_motivo], prefix='m')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_motivo], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 8. Cat_ClaseMax → ccmax_
-        if 'Cat_ClaseMax' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMax ({data['Cat_ClaseMax'].nunique()} valores)")
-            dummies = pd.get_dummies(data['Cat_ClaseMax'], prefix='ccmax')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMax'], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 9. Cat_ClaseMin → ccmin_
-        if 'Cat_ClaseMin' in data.columns:
-            print(f"       → Encoding: Cat_ClaseMin ({data['Cat_ClaseMin'].nunique()} valores)")
-            dummies = pd.get_dummies(data['Cat_ClaseMin'], prefix='ccmin')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMin'], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 10. Tipo Admisión → ta_
-        col_tipo_adm = None
-        for c in data.columns:
-            if 'Tipo' in c and 'Admisión' in c:
-                col_tipo_adm = c
-                break
-        
-        if col_tipo_adm:
-            print(f"       → Encoding: {col_tipo_adm} ({data[col_tipo_adm].nunique()} valores)")
-            dummies = pd.get_dummies(data[col_tipo_adm], prefix='ta')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=[col_tipo_adm], inplace=True)
-            print(f"         Generadas {len(dummies.columns)} dummies")
-        
-        # 11. Sexo → numérico
-        col_sexo = None
-        for c in data.columns:
-            if 'Sexo' in c:
-                col_sexo = c
-                break
-        
-        if col_sexo:
-            print(f"       → Encoding: {col_sexo}")
-            data['Sexo'] = data[col_sexo].replace({'M': 1, 'F': 0, 'Masculino': 1, 'Femenino': 0})
-            if col_sexo != 'Sexo':
-                data.drop(columns=[col_sexo], inplace=True)
-        
-        # 12. Edad → rangos
-        if 'Edad' in data.columns:
-            print("       → Encoding: Edad (rangos)")
-            def map_age_groups(age):
-                if pd.isna(age):
-                    return 0
-                if age <= 19:
-                    return 0
-                elif age <= 24:
-                    return 1
-                else:
-                    return 3
-            
-            data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
-            data.drop(columns=['Edad'], inplace=True)
-        
-        # Eliminar columnas innecesarias
-        cols_eliminar = [
-            # Identificación
-            'ID', 'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última',
-            '2º Apellido', '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
-            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm',
-            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad',
-            'Dirección', 'Dirección 1', 'Dirección 2',
-            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
-            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
-            'Celular Inscripción', 'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm',
-            'Fecha Grado', 'Estado (Dirección)', 'País (Dirección)',
-            'Ciudad Nacimiento', 'Lugar Nacimiento', 'Colegio', 'Colegio_ppn', 'Colegio_adm',
-            'ID Colegio', 'Descripción', 'Org Acad', 'Tipo', 'Estado_adm', 'Estado Clase',
-            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
-            'Ciclo Admisión_per', 'Ciclo Admisión_prom', 'Situacion Acad',
-            'Año', 'Año_per', 'Año_prom', 'Estado', 'Clase_Min_Ciclo', 'Clase_Max_Ciclo',
-            'ID_Min_Ciclo', 'ID_Max_Ciclo', 'Mult Programa', 'Ciclo',
-            'ID Curso', 'Calif', 'Uni Matrd', 'Benef. Beca'
-        ]
-        
-        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
-        if cols_encontradas:
-            data.drop(columns=cols_encontradas, inplace=True)
-        
-        # Eliminar columnas con sufijos
-        cols_sufijos = [col for col in data.columns 
-                       if any(col.endswith(s) for s in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
-        if cols_sufijos:
-            data.drop(columns=cols_sufijos, inplace=True)
-        
-        # Convertir fechas y columnas object a numérico
-        for col in data.select_dtypes(include=['datetime64']).columns:
-            try:
-                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
-                data[col] = data[col].fillna(0)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        for col in data.select_dtypes(include=['object']).columns:
-            try:
-                data[col] = pd.to_numeric(data[col], errors='coerce')
-                data[col] = data[col].fillna(0)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        print(f"\n       ✓ Columnas después del encoding: {len(data.columns)}")
-        print(f"       ✓ Tipos de datos finales:")
-        print(f"          {data.dtypes.value_counts().to_dict()}")
-        
-        return data
-        """Limpieza final y generación de todas las variables dummy"""
-        print("    🧹 Iniciando limpieza y encoding...")
-        print(f"       Columnas antes: {len(data.columns)}")
-        
-        # Normalizar Clase_Min_Ciclo y Clase_Max_Ciclo
-        if 'Clase_Min_Ciclo' in data.columns:
-            data['Clase_Min_Ciclo'] = data['Clase_Min_Ciclo'].str.title()
-        if 'Clase_Max_Ciclo' in data.columns:
-            data['Clase_Max_Ciclo'] = data['Clase_Max_Ciclo'].str.title()
-        
-        # Mapear a categorías
-        if self.mapa_categorias:
-            print("       → Mapeando Clase_Min_Ciclo a categorías...")
-            data['Cat_ClaseMin'] = data['Clase_Min_Ciclo'].map(self.mapa_categorias)
-            data['Cat_ClaseMin'].fillna('Otros', inplace=True)
-            
-            print("       → Mapeando Clase_Max_Ciclo a categorías...")
-            data['Cat_ClaseMax'] = data['Clase_Max_Ciclo'].map(self.mapa_categorias)
-            data['Cat_ClaseMax'].fillna('Otros', inplace=True)
-        
-        # ENCODING - Crear variables dummy en el orden del pipeline
-        
-        # 1. Programa → p_
-        if 'Programa' in data.columns:
-            print("       → Encoding: Programa")
-            dummies = pd.get_dummies(data['Programa'], prefix='p')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Programa'], inplace=True)
-        
-        # 2. Siglas Prog → s_
-        if 'Siglas Prog' in data.columns:
-            print("       → Encoding: Siglas Prog")
-            dummies = pd.get_dummies(data['Siglas Prog'], prefix='s')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Siglas Prog'], inplace=True)
-        
-        # 3. Ciudad (Dirección) → cd_
-        if 'Ciudad (Dirección)' in data.columns:
-            print("       → Encoding: Ciudad (Dirección)")
-            dummies = pd.get_dummies(data['Ciudad (Dirección)'], prefix='cd')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Ciudad (Dirección)'], inplace=True)
-        
-        # 4. Dpto Nacimiento → dn_
-        if 'Dpto Nacimiento' in data.columns:
-            print("       → Encoding: Dpto Nacimiento")
-            dummies = pd.get_dummies(data['Dpto Nacimiento'], prefix='dn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Dpto Nacimiento'], inplace=True)
-        
-        # 5. País Nacimiento → pn_
-        if 'País Nacimiento' in data.columns:
-            print("       → Encoding: País Nacimiento")
-            dummies = pd.get_dummies(data['País Nacimiento'], prefix='pn')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['País Nacimiento'], inplace=True)
-        
-        # 6. Acción → a_
-        # Resolver duplicados primero
-        if 'Acción_per' in data.columns:
-            data.rename(columns={'Acción_per': 'Acción'}, inplace=True)
-            data.drop(columns=['Acción_prom', 'Acción_ppn'], inplace=True, errors='ignore')
-        
-        if 'Acción' in data.columns:
-            print("       → Encoding: Acción")
-            dummies = pd.get_dummies(data['Acción'], prefix='a')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Acción'], inplace=True)
-        
-        # 7. Motivo → m_
-        if 'Motivo_per' in data.columns:
-            data.rename(columns={'Motivo_per': 'Motivo'}, inplace=True)
-            data.drop(columns=['Motivo_prom', 'Motivo_ppn'], inplace=True, errors='ignore')
-        
-        if 'Motivo' in data.columns:
-            print("       → Encoding: Motivo")
-            dummies = pd.get_dummies(data['Motivo'], prefix='m')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Motivo'], inplace=True)
-        
-        # 8. Cat_ClaseMax → ccmax_
-        if 'Cat_ClaseMax' in data.columns:
-            print("       → Encoding: Cat_ClaseMax")
-            dummies = pd.get_dummies(data['Cat_ClaseMax'], prefix='ccmax')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMax'], inplace=True)
-        
-        # 9. Cat_ClaseMin → ccmin_
-        if 'Cat_ClaseMin' in data.columns:
-            print("       → Encoding: Cat_ClaseMin")
-            dummies = pd.get_dummies(data['Cat_ClaseMin'], prefix='ccmin')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Cat_ClaseMin'], inplace=True)
-        
-        # 10. Tipo Admisión → ta_
-        if 'Tipo Admisión' in data.columns:
-            print("       → Encoding: Tipo Admisión")
-            dummies = pd.get_dummies(data['Tipo Admisión'], prefix='ta')
-            data = pd.concat([data, dummies], axis=1)
-            data.drop(columns=['Tipo Admisión'], inplace=True)
-        
-        # 11. Sexo → numérico
-        # Resolver duplicados
-        if 'Sexo_ppn' in data.columns:
-            data.rename(columns={'Sexo_ppn': 'Sexo'}, inplace=True)
-            data.drop(columns=['Sexo_adm'], inplace=True, errors='ignore')
-        
-        if 'Sexo' in data.columns:
-            print("       → Encoding: Sexo")
-            data['Sexo'] = data['Sexo'].replace({'M': 1, 'F': 0, 'Masculino': 1, 'Femenino': 0})
-        
-        # 12. Edad → rangos
-        if 'Edad' in data.columns:
-            print("       → Encoding: Edad (rangos)")
-            def map_age_groups(age):
-                if pd.isna(age):
-                    return 0
-                if age <= 19:
-                    return 0
-                elif age <= 24:
-                    return 1
-                else:
-                    return 3
-            
-            data['rango_edad'] = data['Edad'].apply(map_age_groups).astype('int8')
-            data.drop(columns=['Edad'], inplace=True)
-        
-        # Eliminar columnas innecesarias
-        cols_eliminar = [
-            # Identificación
-            'ID', 'Nombre', 'Nombre_ppn', 'Nombre_adm', '2º Nombre', 'Última',
-            '2º Apellido', '2º Apellido_per', '2º Apellido_prom', 'Apellidos', 'Nombres',
-            'Tipo Doc ID', 'Tipo Doc ID_ppn', 'Tipo Doc ID_adm',
-            'Doc ID', 'Doc Identidad', 'Tipo Doc Identidad',
-            'Dirección', 'Dirección 1', 'Dirección 2',
-            'Teléfono', 'Teléfono_ppn', 'Teléfono_adm',
-            'Correo-E', 'Correo-E_ppn', 'Correo-E_adm', 'Otro Correo E',
-            'Celular Inscripción', 'F Nacimiento', 'F Nacimiento_ppn', 'F Nacimiento_adm',
-            'Fecha Grado', 'Estado (Dirección)', 'País (Dirección)',
-            'Ciudad Nacimiento', 'Lugar Nacimiento', 'Colegio', 'Colegio_ppn', 'Colegio_adm',
-            'ID Colegio', 'Descripción', 'Org Acad', 'Tipo', 'Estado_adm', 'Estado Clase',
-            'Prog Acad', 'Prog Acad_ppn', 'Prog Acad_adm', 'Prog Acad.1',
-            'Ciclo Admisión_per', 'Ciclo Admisión_prom', 'Situacion Acad',
-            'Año', 'Año_per', 'Año_prom', 'Estado', 'Clase_Min_Ciclo', 'Clase_Max_Ciclo',
-            'ID_Min_Ciclo', 'ID_Max_Ciclo', 'Mult Programa', 'Ciclo',
-            'ID Curso', 'Calif', 'Uni Matrd', 'Benef. Beca'
-        ]
-        
-        cols_encontradas = [c for c in cols_eliminar if c in data.columns]
-        if cols_encontradas:
-            data.drop(columns=cols_encontradas, inplace=True)
-        
-        # Eliminar columnas con sufijos
-        cols_sufijos = [col for col in data.columns 
-                       if any(col.endswith(s) for s in ['_per', '_prom', '_adm', '_ppn', '_pprom', '_notas'])]
-        if cols_sufijos:
-            data.drop(columns=cols_sufijos, inplace=True)
-        
-        # Convertir fechas y columnas object a numérico
-        for col in data.select_dtypes(include=['datetime64']).columns:
-            try:
-                data[col] = (data[col] - pd.Timestamp('1970-01-01')).dt.days
-                data[col].fillna(0, inplace=True)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        for col in data.select_dtypes(include=['object']).columns:
-            try:
-                data[col] = pd.to_numeric(data[col], errors='coerce')
-                data[col].fillna(0, inplace=True)
-            except:
-                data.drop(columns=[col], inplace=True)
-        
-        print(f"       ✓ Columnas después: {len(data.columns)}")
-        
-        return data
     
     def predecir(self, data: pd.DataFrame) -> pd.DataFrame:
         """Realiza predicciones con el modelo XGBoost"""
@@ -1502,9 +245,169 @@ class DataProcessorXGBoost:
             print(f"   🔴 Alto: {(resultado['nivel_riesgo']=='Alto').sum()}")
             
             return resultado
+
+        """
+AGREGAR ESTE MÉTODO A data_processor_xgboost.py
+Después del método predecir() existente
+"""
+
+def predecir_procesado(self, data_procesada: pd.DataFrame) -> pd.DataFrame:
+    """
+    Realiza predicciones con datos YA PROCESADOS por el pipeline integrado
+    
+    Este método NO procesa los datos, solo ejecuta la predicción con el modelo XGBoost.
+    Usar cuando los datos vienen de:
+    - data_processor_limpieza_COMPLETO.py
+    - data_processor_encoding.py
+    - data_processor_ajustes.py
+    
+    Args:
+        data_procesada: DataFrame ya procesado (limpieza + encoding + ajustes)
+        
+    Returns:
+        DataFrame con columnas adicionales:
+        - probabilidad: Probabilidad de deserción (0-1)
+        - nivel_riesgo: Nivel de riesgo ("Bajo", "Medio", "Alto")
+    """
+    print("\n" + "="*80)
+    print("🎯 INICIANDO PREDICCIÓN CON DATOS PROCESADOS")
+    print("="*80)
+    print(f"   📊 Registros recibidos: {len(data_procesada):,}")
+    print(f"   📊 Columnas recibidas: {len(data_procesada.columns)}")
+    
+    # Verificar que el modelo esté cargado
+    if self.modelo is None:
+        raise ValueError(
+            "❌ Modelo XGBoost no cargado.\n"
+            "   Verifica que 'xgboost_modelo.pkl' esté en la raíz del proyecto."
+        )
+    
+    print(f"   ✅ Modelo cargado: {type(self.modelo).__name__}")
+    
+    try:
+        # ============================================================
+        # PREPARACIÓN DE DATOS
+        # ============================================================
+        
+        X = data_procesada.copy()
+        
+        print("\n🔧 Preparando datos para predicción...")
+        
+        # 1. Eliminar columnas no numéricas
+        cols_object = X.select_dtypes(include=['object']).columns.tolist()
+        if cols_object:
+            print(f"   → Eliminando {len(cols_object)} columnas no numéricas: {cols_object[:5]}...")
+            X = X.drop(columns=cols_object)
+        
+        # 2. Eliminar columnas duplicadas
+        if X.columns.duplicated().any():
+            duplicados = X.columns[X.columns.duplicated()].tolist()
+            print(f"   → Eliminando {len(duplicados)} columnas duplicadas: {duplicados[:5]}...")
+            X = X.loc[:, ~X.columns.duplicated()]
+        
+        # 3. Manejar valores infinitos
+        X = X.replace([np.inf, -np.inf], np.nan)
+        
+        # 4. Rellenar NaN con 0
+        if X.isnull().any().any():
+            nulos_count = X.isnull().sum().sum()
+            print(f"   → Rellenando {nulos_count:,} valores NaN con 0")
+            X = X.fillna(0)
+        
+        # 5. Alinear con columnas del modelo (si existen)
+        if self.columnas_modelo is not None:
+            print(f"   → Alineando con columnas del modelo ({len(self.columnas_modelo)} columnas esperadas)")
             
-        except Exception as e:
-            print(f"❌ Error en predicción: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise
+            # Agregar columnas faltantes con 0
+            cols_faltantes = [col for col in self.columnas_modelo if col not in X.columns]
+            if cols_faltantes:
+                print(f"      • Agregando {len(cols_faltantes)} columnas faltantes con 0")
+                for col in cols_faltantes:
+                    X[col] = 0
+            
+            # Eliminar columnas extra
+            cols_extra = [col for col in X.columns if col not in self.columnas_modelo]
+            if cols_extra:
+                print(f"      • Eliminando {len(cols_extra)} columnas extra")
+                X = X.drop(columns=cols_extra)
+            
+            # Ordenar según modelo
+            X = X[self.columnas_modelo]
+        
+        print(f"   ✅ Datos preparados: {X.shape}")
+        
+        # ============================================================
+        # APLICAR SCALER (si existe)
+        # ============================================================
+        
+        if self.scaler is not None:
+            print("   🔧 Aplicando scaler (estandarización)...")
+            X_scaled = self.scaler.transform(X)
+        else:
+            print("   ℹ️ No hay scaler, usando datos sin estandarizar")
+            X_scaled = X.values
+        
+        # ============================================================
+        # PREDICCIÓN CON xgboost_modelo.pkl
+        # ============================================================
+        
+        print("\n🤖 Ejecutando predicción con XGBoost...")
+        
+        # Detectar tipo de modelo
+        modelo_tipo = type(self.modelo).__name__
+        print(f"   Tipo de modelo: {modelo_tipo}")
+        
+        if 'ExponentiatedGradient' in modelo_tipo:
+            # Modelo con mitigación de sesgo
+            print("   ℹ️ Modelo con mitigación de sesgo detectado")
+            predicciones = self.modelo.predict(X_scaled)
+            probabilidades = np.where(predicciones == 1, 0.9, 0.1)
+        else:
+            # Modelo estándar (XGBoost, RandomForest, etc.)
+            if hasattr(self.modelo, 'predict_proba'):
+                probabilidades = self.modelo.predict_proba(X_scaled)[:, 1]
+            else:
+                # Fallback si no tiene predict_proba
+                predicciones = self.modelo.predict(X_scaled)
+                probabilidades = predicciones.astype(float)
+        
+        print(f"   ✅ Predicciones generadas: {len(probabilidades):,}")
+        
+        # ============================================================
+        # AGREGAR RESULTADOS AL DATAFRAME
+        # ============================================================
+        
+        resultado = data_procesada.copy()
+        resultado['probabilidad'] = probabilidades
+        
+        # Clasificar nivel de riesgo
+        resultado['nivel_riesgo'] = pd.cut(
+            probabilidades,
+            bins=[0, 0.3, 0.6, 1.0],
+            labels=["Bajo", "Medio", "Alto"]
+        )
+        
+        # ============================================================
+        # ESTADÍSTICAS FINALES
+        # ============================================================
+        
+        print("\n" + "="*80)
+        print("✅ PREDICCIÓN COMPLETADA")
+        print("="*80)
+        print(f"   📊 Estudiantes analizados: {len(resultado):,}")
+        print(f"   📊 Probabilidad promedio: {probabilidades.mean():.2%}")
+        print(f"   📊 Probabilidad mínima: {probabilidades.min():.2%}")
+        print(f"   📊 Probabilidad máxima: {probabilidades.max():.2%}")
+        print("\n   📈 Distribución de riesgo:")
+        print(f"      🟢 Bajo (<30%):   {(resultado['nivel_riesgo']=='Bajo').sum():>6,} estudiantes")
+        print(f"      🟡 Medio (30-60%): {(resultado['nivel_riesgo']=='Medio').sum():>6,} estudiantes")
+        print(f"      🔴 Alto (>60%):    {(resultado['nivel_riesgo']=='Alto').sum():>6,} estudiantes")
+        print("="*80 + "\n")
+        
+        return resultado
+        
+    except Exception as e:
+        print(f"\n❌ ERROR EN PREDICCIÓN: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
