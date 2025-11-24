@@ -289,12 +289,15 @@ class DataProcessorAjustes:
         
         return data
     
-    # ============================================================================
-    # FASE 5: CREAR ESTADO_NEXT
+  # ============================================================================
+    # FASE 5: CREAR ESTADO_NEXT Y ELIMINAR DESERCION
     # ============================================================================
     
     def _crear_estado_next(self, data):
-        """Crear variable Estado_next (predicción del próximo ciclo)"""
+        """
+        Crear variable Estado_next (predicción del próximo ciclo)
+        y eliminar la columna 'desercion' del dataset
+        """
         print("\n🎯 Creando Estado_next...")
         
         cols_p = [c for c in data.columns if c.startswith('p_')]
@@ -349,6 +352,29 @@ class DataProcessorAjustes:
             print(f"   ✓ Penúltimo ciclo ({penultimo_ciclo}) marcado como 0")
         
         print(f"   ✓ Estado_next creado")
+        
+        # ============================================================================
+        # ELIMINAR COLUMNA 'desercion'
+        # ============================================================================
+        
+        print("\n🗑️ Eliminando columna 'desercion'...")
+        
+        # Buscar todas las variantes posibles de la columna desercion
+        columnas_a_eliminar = []
+        
+        for col in data.columns:
+            col_lower = col.lower()
+            if 'desercion' in col_lower or 'deserción' in col_lower:
+                columnas_a_eliminar.append(col)
+        
+        if columnas_a_eliminar:
+            print(f"   → Columnas encontradas: {columnas_a_eliminar}")
+            data = data.drop(columns=columnas_a_eliminar)
+            print(f"   ✓ {len(columnas_a_eliminar)} columna(s) eliminada(s)")
+        else:
+            print("   ℹ️ No se encontró columna 'desercion' en el dataset")
+        
+        print(f"   ✓ Dataset final: {len(data)} registros, {len(data.columns)} columnas")
         
         return data
     
