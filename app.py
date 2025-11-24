@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 import sys
 import os
+from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
 
 # Importar el procesador de datos
 from data_processor_xgboost import DataProcessorXGBoost
@@ -275,151 +276,252 @@ if menu == "🏠 Inicio":
 
 # SECCIÓN PARA REEMPLAZAR EN APP.PY - CARGAR DATOS
 
+"""
+Sección actualizada de "📤 Cargar Datos"
+Reemplaza la sección correspondiente en tu app.py
+"""
+
+# ====================================================================
+# PÁGINA: CARGAR DATOS (REEMPLAZAR EN TU APP.PY)
+# ====================================================================
+
+# Agregar este import al inicio del archivo
+from pipeline_integrado import ejecutar_pipeline_streamlit, validar_excel
+
+# Luego, en el menú donde dice: elif menu == "📤 Cargar Datos":
+# REEMPLAZAR TODO con esto:
+
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
     
+    # Instrucciones
     st.markdown(f"""
-    <div class='warning-message'>
-        <h4>📋 Instrucciones de Carga</h4>
-        <p>Debes cargar UN archivo Excel que contenga <b>4 hojas (sheets)</b> con los siguientes nombres:</p>
-        <ul>
+    <div style='padding: 1.5rem; background-color: #FFF9C4; border-radius: 10px; border-left: 4px solid {COLORS['warning']}; margin-bottom: 2rem;'>
+        <h3 style='color: {COLORS['text']}; margin-top: 0;'>📋 Instrucciones de Carga</h3>
+        <p style='color: {COLORS['text']}; margin-bottom: 0.5rem;'>
+        Debes cargar <b>UN archivo Excel</b> que contenga <b>4 hojas (sheets)</b> con los siguientes nombres:
+        </p>
+        <ul style='color: {COLORS['text']}; margin-bottom: 0;'>
             <li><b>NOTAS</b> - Calificaciones y materias de estudiantes</li>
             <li><b>PER</b> - Información personal de estudiantes</li>
             <li><b>PROM</b> - Promedios académicos</li>
             <li><b>ADM</b> - Datos de admisión</li>
         </ul>
-        <p><b>IMPORTANTE:</b> Los nombres de las hojas deben ser exactamente como se muestran arriba.</p>
+        <p style='color: {COLORS['text']}; margin-top: 1rem; margin-bottom: 0;'>
+        <b>IMPORTANTE:</b> Los nombres de las hojas deben ser exactamente como se muestran arriba.
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    # Upload del archivo
+    st.markdown("### 📂 Seleccionar Archivo")
     
-    # Subir archivo
     uploaded_file = st.file_uploader(
-        "📊 Sube el archivo Excel con las 4 hojas",
+        "Sube tu archivo Excel con las 4 hojas",
         type=['xlsx', 'xls'],
-        help="Archivo Excel con hojas: NOTAS, PER, PROM, ADM"
+        help="El archivo debe contener las hojas: NOTAS, PER, PROM, ADM",
+        key="excel_upload"
     )
     
     if uploaded_file is not None:
+        # Validar archivo
         with st.spinner("🔍 Validando archivo..."):
-            try:
-                # Verificar que el archivo tiene las 4 hojas
-                excel_file = pd.ExcelFile(uploaded_file)
-                hojas_requeridas = ['NOTAS', 'PER', 'PROM', 'ADM']
-                hojas_existentes = excel_file.sheet_names
-                
-                hojas_faltantes = [h for h in hojas_requeridas if h not in hojas_existentes]
-                
-                if hojas_faltantes:
-                    st.markdown(f"""
-                    <div class='error-message'>
-                        <h4>❌ Error: Faltan hojas en el archivo</h4>
-                        <p>El archivo debe contener las siguientes hojas:</p>
-                        <ul>
-                            {''.join([f"<li><b>{h}</b></li>" for h in hojas_requeridas])}
-                        </ul>
-                        <p>Hojas faltantes: <b>{', '.join(hojas_faltantes)}</b></p>
-                        <p>Hojas encontradas: {', '.join(hojas_existentes)}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    # Leer las 4 hojas
-                    notas = pd.read_excel(uploaded_file, sheet_name='NOTAS')
-                    per = pd.read_excel(uploaded_file, sheet_name='PER')
-                    prom = pd.read_excel(uploaded_file, sheet_name='PROM')
-                    adm = pd.read_excel(uploaded_file, sheet_name='ADM')
-                    
-                    st.markdown(f"""
-                    <div class='success-message'>
-                        <h4>✅ Archivo válido</h4>
-                        <p>Se cargaron las 4 hojas correctamente:</p>
-                        <ul>
-                            <li><b>NOTAS:</b> {len(notas):,} registros</li>
-                            <li><b>PER:</b> {len(per):,} registros</li>
-                            <li><b>PROM:</b> {len(prom):,} registros</li>
-                            <li><b>ADM:</b> {len(adm):,} registros</li>
-                        </ul>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Mostrar preview opcional
-                    with st.expander("👁️ Ver vista previa de los datos"):
-                        tab1, tab2, tab3, tab4 = st.tabs(["NOTAS", "PER", "PROM", "ADM"])
-                        
-                        with tab1:
-                            st.dataframe(notas.head(10), use_container_width=True)
-                        with tab2:
-                            st.dataframe(per.head(10), use_container_width=True)
-                        with tab3:
-                            st.dataframe(prom.head(10), use_container_width=True)
-                        with tab4:
-                            st.dataframe(adm.head(10), use_container_width=True)
-                    
-                    st.markdown("---")
-                    
-                    # Botón para procesar
-                    if st.button("🚀 Procesar y Generar Predicciones", use_container_width=True, type="primary"):
-                        with st.spinner("⚙️ Ejecutando pipeline de procesamiento y modelo XGBoost..."):
-                            try:
-                                # Inicializar procesador
-                                from data_processor_xgboost import DataProcessorXGBoost
-                                processor = DataProcessorXGBoost(model_dir='models')
-                                
-                                # Procesar datos
-                                data_procesada = processor.procesar_dataframes(notas, per, prom, adm)
-                                
-                                # Realizar predicciones
-                                resultados = processor.predecir(data_procesada)
-                                
-                                # Guardar en session state
-                                st.session_state['processed_data'] = resultados
-                                st.session_state['data_original'] = {
-                                    'notas': notas,
-                                    'per': per,
-                                    'prom': prom,
-                                    'adm': adm
-                                }
-                                st.session_state['upload_time'] = datetime.now()
-                                
-                                st.markdown(f"""
-                                <div class='success-message'>
-                                    <h4>🎉 ¡Procesamiento completado!</h4>
-                                    <p>✅ Pipeline ejecutado correctamente</p>
-                                    <p>✅ Predicciones generadas con XGBoost</p>
-                                    <p>✅ <b>{len(resultados):,}</b> estudiantes analizados</p>
-                                    <p>📊 Ve a la sección <b>Resultados</b> para ver los análisis.</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                st.balloons()
-                                
-                            except Exception as e:
-                                st.markdown(f"""
-                                <div class='error-message'>
-                                    <h4>❌ Error en el procesamiento</h4>
-                                    <p><b>Error:</b> {str(e)}</p>
-                                    <p>Por favor, verifica que:</p>
-                                    <ul>
-                                        <li>El modelo XGBoost esté en la carpeta /models</li>
-                                        <li>Los datos tengan el formato correcto</li>
-                                        <li>Las columnas requeridas estén presentes</li>
-                                    </ul>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # Mostrar el error completo en un expander
-                                with st.expander("🔍 Ver detalles técnicos del error"):
-                                    st.code(str(e))
+            es_valido, mensaje, dfs = validar_excel(uploaded_file)
+        
+        if not es_valido:
+            st.error(mensaje)
+        else:
+            # Mostrar información del archivo
+            st.success("✅ Archivo cargado correctamente")
             
-            except Exception as e:
-                st.markdown(f"""
-                <div class='error-message'>
-                    <h4>❌ Error al leer el archivo</h4>
-                    <p>{str(e)}</p>
-                    <p>Verifica que el archivo sea un Excel válido (.xlsx o .xls)</p>
-                </div>
-                """, unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.info(f"""
+                **📁 Archivo:** {uploaded_file.name}  
+                **📊 Tamaño:** {uploaded_file.size / 1024:.1f} KB
+                """)
+            
+            with col2:
+                st.info(f"""
+                **📋 NOTAS:** {len(dfs['NOTAS']):,} registros  
+                **👤 PER:** {len(dfs['PER']):,} registros  
+                **📈 PROM:** {len(dfs['PROM']):,} registros  
+                **🎓 ADM:** {len(dfs['ADM']):,} registros
+                """)
+            
+            # Vista previa de las hojas
+            st.markdown("---")
+            st.markdown("### 👁️ Vista Previa de los Datos")
+            
+            tab1, tab2, tab3, tab4 = st.tabs(["📋 NOTAS", "👤 PER", "📈 PROM", "🎓 ADM"])
+            
+            with tab1:
+                st.dataframe(dfs['NOTAS'].head(100), use_container_width=True, height=300)
+                st.caption(f"Mostrando primeras 100 filas de {len(dfs['NOTAS']):,} registros")
+            
+            with tab2:
+                st.dataframe(dfs['PER'].head(100), use_container_width=True, height=300)
+                st.caption(f"Mostrando primeras 100 filas de {len(dfs['PER']):,} registros")
+            
+            with tab3:
+                st.dataframe(dfs['PROM'].head(100), use_container_width=True, height=300)
+                st.caption(f"Mostrando primeras 100 filas de {len(dfs['PROM']):,} registros")
+            
+            with tab4:
+                st.dataframe(dfs['ADM'].head(100), use_container_width=True, height=300)
+                st.caption(f"Mostrando primeras 100 filas de {len(dfs['ADM']):,} registros")
+            
+            # Botón de procesamiento
+            st.markdown("---")
+            st.markdown("### 🚀 Procesar Datos")
+            
+            st.info("""
+            **El procesamiento incluye 4 pasos:**
+            
+            1. 🧹 **Limpieza** (10 fases): Consolidación, filtros, merge de bases
+            2. 🎨 **Encoding** (11 fases): Dumificación, transformaciones
+            3. 🔧 **Ajustes** (12 fases): Dropout corrida, columnas finales
+            4. 🤖 **Predicción**: Modelo XGBoost ejecuta predicciones
+            
+            ⏱️ **Tiempo estimado:** 30-60 segundos según tamaño de datos
+            """)
+            
+            col1, col2, col3 = st.columns([1, 2, 1])
+            
+            with col2:
+                if st.button("🚀 PROCESAR Y PREDECIR", type="primary", use_container_width=True):
+                    try:
+                        st.markdown("---")
+                        
+                        # Contenedor para logs
+                        with st.container():
+                            st.markdown(f"""
+                            <div style='padding: 1rem; background-color: {COLORS['background']}; border-radius: 10px; border-left: 4px solid {COLORS['primary']};'>
+                                <h4 style='color: {COLORS['text']}; margin: 0;'>⏳ Procesando datos...</h4>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Ejecutar pipeline con barra de progreso
+                            data_procesada = ejecutar_pipeline_streamlit(
+                                dfs['NOTAS'],
+                                dfs['PER'],
+                                dfs['PROM'],
+                                dfs['ADM']
+                            )
+                            
+                            st.success("✅ Datos procesados correctamente!")
+                            
+                            # Guardar en session_state
+                            st.session_state['data_procesada'] = data_procesada
+                            st.session_state['archivo_cargado'] = uploaded_file.name
+                            
+                            # Mostrar resumen
+                            st.markdown("---")
+                            st.markdown("### 📊 Resumen del Procesamiento")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.metric(
+                                    "📝 Registros Procesados",
+                                    f"{len(data_procesada):,}"
+                                )
+                            
+                            with col2:
+                                st.metric(
+                                    "📊 Variables Totales",
+                                    f"{len(data_procesada.columns)}"
+                                )
+                            
+                            with col3:
+                                if 'desercion' in data_procesada.columns:
+                                    desercion_count = (data_procesada['desercion'] == 1).sum()
+                                    st.metric(
+                                        "⚠️ Con Deserción",
+                                        f"{desercion_count:,}"
+                                    )
+                                else:
+                                    st.metric("⚠️ Deserción", "N/A")
+                            
+                            # Mostrar vista previa
+                            st.markdown("---")
+                            st.markdown("### 👁️ Vista Previa de Datos Procesados")
+                            st.dataframe(
+                                data_procesada.head(50),
+                                use_container_width=True,
+                                height=300
+                            )
+                            
+                            # Botón para ir a predicción
+                            st.markdown("---")
+                            
+                            st.success("""
+                            ✅ **¡Datos listos para predicción!**
+                            
+                            Ahora ejecutaremos el modelo XGBoost para predecir riesgo de deserción.
+                            """)
+                            
+                            col1, col2, col3 = st.columns([1, 2, 1])
+                            with col2:
+                                if st.button("🤖 EJECUTAR PREDICCIÓN", type="primary", use_container_width=True):
+                                    with st.spinner("🤖 Ejecutando modelo XGBoost..."):
+                                        # Aquí se ejecuta la predicción
+                                        # El código de predicción ya está en tu app original
+                                        # Solo necesitamos ejecutarlo con data_procesada
+                                        
+                                        try:
+                                            # Usar el procesador que ya tienes
+                                            processor = st.session_state.get('processor', DataProcessorXGBoost())
+                                            
+                                            # Ejecutar predicción
+                                            resultados = processor.predict(data_procesada)
+                                            
+                                            # Guardar resultados
+                                            st.session_state['resultados'] = resultados
+                                            st.session_state['data_procesada_completa'] = data_procesada
+                                            
+                                            st.success("✅ ¡Predicción completada!")
+                                            st.balloons()
+                                            
+                                            st.info("""
+                                            **Predicción completada exitosamente!**
+                                            
+                                            Ve a la sección **📊 Resultados** en el menú lateral para ver el análisis completo.
+                                            """)
+                                            
+                                        except Exception as e:
+                                            st.error(f"❌ Error en la predicción: {str(e)}")
+                                            st.exception(e)
+                    
+                    except Exception as e:
+                        st.error(f"❌ Error durante el procesamiento: {str(e)}")
+                        st.exception(e)
+                        
+                        st.warning("""
+                        **Posibles causas del error:**
+                        - Datos faltantes en columnas requeridas
+                        - Formato incorrecto en alguna hoja
+                        - Valores inesperados en variables clave
+                        
+                        Revisa los logs anteriores para más detalles.
+                        """)
+    
+    else:
+        # Mensaje cuando no hay archivo cargado
+        st.info("""
+        👆 **Sube tu archivo Excel para comenzar**
+        
+        El sistema procesará automáticamente los datos y ejecutará el modelo de predicción.
+        """)
+        
+        # Ejemplo visual
+        st.markdown("---")
+        st.markdown("### 📋 Ejemplo de Estructura del Archivo")
+        
+        st.image("https://via.placeholder.com/800x400/3A4A3D/FFFFFF?text=Estructura+del+Excel:+4+hojas+(NOTAS,+PER,+PROM,+ADM)", 
+                 use_container_width=True,
+                 caption="El archivo Excel debe contener exactamente estas 4 hojas")
 
 # SECCIÓN PARA REEMPLAZAR EN APP.PY - RESULTADOS
 
