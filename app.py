@@ -226,21 +226,7 @@ if menu == "🏠 Inicio":
             </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("### ⚙️ Cómo usar esta herramienta")
-    
-    steps = """
-    1. **📥 Descarga la plantilla** de Excel desde la sección "Cargar Datos"
-    2. **✏️ Completa la información** de los estudiantes en la plantilla
-    3. **📤 Sube el archivo** completado a la aplicación
-    4. **📊 Visualiza los resultados** y predicciones automáticas
-    5. **💾 Descarga** el informe con todas las probabilidades calculadas
-    """
-    
-    st.info(steps)
-    
+      
     st.markdown("---")
     
     st.markdown("### 🎯 Niveles de Riesgo")
@@ -702,7 +688,7 @@ elif menu == "📊 Resultados":
             with col1:
                 st.markdown("""
                 **Modelo:** XGBoost con Mitigación de Sesgo  
-                **Variable Protegida:** Sexo  
+                **Variable Protegida:** Beneficio Beca  
                 **Técnica de Mitigación:** Exponentiated Gradient
                 """)
             
