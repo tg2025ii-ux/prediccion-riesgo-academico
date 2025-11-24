@@ -732,8 +732,7 @@ elif menu == "📊 Resultados":
                 st.markdown("### ⚖️ Análisis de Equidad")
                 
                 st.info("""
-                Este análisis verifica que el modelo no tenga sesgos significativos 
-                respecto a variables protegidas como **Sexo** o **Beneficiario de Beca**.
+                Distribución de probabilidad por caracteristicas personales.
                 """)
                 
                 col1, col2 = st.columns(2)
@@ -773,14 +772,10 @@ elif menu == "📊 Resultados":
                         # Tabla comparativa
                         sexo_stats = df_temp.groupby('Sexo_Label')['probabilidad'].agg([
                             ('Promedio', 'mean'),
-                            ('Mediana', 'median'),
-                            ('Desv. Est.', 'std'),
                             ('Cantidad', 'count')
                         ]).reset_index()
                         
                         sexo_stats['Promedio'] = sexo_stats['Promedio'].apply(lambda x: f"{x:.2%}")
-                        sexo_stats['Mediana'] = sexo_stats['Mediana'].apply(lambda x: f"{x:.2%}")
-                        sexo_stats['Desv. Est.'] = sexo_stats['Desv. Est.'].apply(lambda x: f"{x:.4f}")
                         sexo_stats['Cantidad'] = sexo_stats['Cantidad'].apply(lambda x: f"{x:,}")
                         
                         st.dataframe(sexo_stats, use_container_width=True, hide_index=True)
@@ -821,14 +816,10 @@ elif menu == "📊 Resultados":
                         # Tabla comparativa
                         beca_stats = df_temp.groupby('Beca_Label')['probabilidad'].agg([
                             ('Promedio', 'mean'),
-                            ('Mediana', 'median'),
-                            ('Desv. Est.', 'std'),
                             ('Cantidad', 'count')
                         ]).reset_index()
                         
                         beca_stats['Promedio'] = beca_stats['Promedio'].apply(lambda x: f"{x:.2%}")
-                        beca_stats['Mediana'] = beca_stats['Mediana'].apply(lambda x: f"{x:.2%}")
-                        beca_stats['Desv. Est.'] = beca_stats['Desv. Est.'].apply(lambda x: f"{x:.4f}")
                         beca_stats['Cantidad'] = beca_stats['Cantidad'].apply(lambda x: f"{x:,}")
                         
                         st.dataframe(beca_stats, use_container_width=True, hide_index=True)
