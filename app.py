@@ -277,17 +277,6 @@ if menu == "🏠 Inicio":
 elif menu == "📤 Cargar Datos":
     st.title("📤 Cargar Bases de Datos de la Universidad")
     
-       st.markdown("### ⚙️ Cómo usar esta herramienta")
-    
-    steps = """
-    1. **📤 Ve a "Cargar Datos"** en el menú lateral
-    2. **📂 Sube tu archivo Excel** con las 4 hojas (NOTAS, PER, PROM, ADM)
-    3. **🚀 Click en "PROCESAR Y PREDECIR"** (el sistema ejecuta automáticamente todo el pipeline)
-    4. **📊 Ve a "Resultados"** para ver el dashboard interactivo
-    5. **💾 Descarga** los resultados en Excel o CSV
-    """
-    
-    st.info(steps)
     
     st.markdown("---")
     
